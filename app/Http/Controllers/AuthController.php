@@ -1,0 +1,108 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\ResidentProfile;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\HasApiTokens;
+use App\Models\User;
+use Carbon\Carbon;
+use App\Models\Role;
+
+class AuthController extends Controller
+{
+    public function register(request $request)
+    {
+        $request->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
+            
+            'birthdate' => 'nullable|date',
+            'address' => 'nullable|string',
+            'id_number' => 'nullable|string',
+            'id_image_path' => 'nullable|string',
+        ]);
+        $residentRoleId = Role::where('name', 'Resident')->value('id');
+
+        $age = null;
+        if ($request->birthdate) {
+            $age = Carbon::parse($request->birthdate)->age;
+        }
+
+        $user = User::create([
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role_id' => $residentRoleId,
+            'birthdate' => $request->birthdate,
+            'address' => $request->address,
+            'age' => $age,
+            'contact_num' => $request->contact_num ?? null,
+        ]);
+
+        ResidentProfile::create([
+            'user_id' => $user->id,
+            'id_number' => $request->id_number,
+            'id_image_path' => $request->id_image_path,
+            'full_name' => $request->first_name . ' ' . $request->last_name,
+            'address' => $request->address,
+            'birthdate' => $request->birthdate,
+        ]);
+
+        return response()->json([
+            'message' => 'Registration successful',
+            'user' => $user
+        ], 201);
+    }
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'message' => 'Invalid email or password',
+            ], 401);
+        }
+
+        $token = $user->createToken('resbac-token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Login successful',
+            'token' => $token,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role_id' => $user->role_id,
+            ],
+        ], 200);
+    }
+    public function logout(Request $request)
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'message' => 'Logout successful'
+        ]);
+    }
+
+    public function me(Request $request)
+    {
+        if ($request->user() && $request->user()->currentAccessToken()) {
+            $request->user()->currentAccessToken()->forceFill([
+                'last_used_at' => now()
+            ])->save();
+        }
+
+        return response()->json($request->user());
+    }
+}
