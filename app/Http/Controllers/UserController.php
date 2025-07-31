@@ -12,10 +12,10 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::query();
+        $query = User::with('role');
 
         if ($request->has('role')) {
-            $query->where('role', $request->role);
+            $query->where('role_id', $request->role);
         }
 
         if ($request->has('residency_status')) {

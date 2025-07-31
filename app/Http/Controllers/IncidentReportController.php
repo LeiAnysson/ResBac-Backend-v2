@@ -19,13 +19,14 @@ class IncidentReportController extends Controller
             $query->where('incident_type_id', $request->incident_type_id);
         }
 
-        return response()->json($query->pagination(10));
+        return response()->json($query->paginate(10));
     }
     public function show($id)
     {
-        $incident = IncidentReport::with('incidentType')
-            ->where('id', $id)->first();
-        
+        $incident = IncidentReport::with(['incidentType', 'user']) 
+            ->where('id', $id)
+            ->first();
+
         if (!$incident){
             return response()->json(['message' => 'Incident Report not found'], 404);
         }

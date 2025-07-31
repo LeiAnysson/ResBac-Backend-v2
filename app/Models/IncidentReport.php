@@ -39,4 +39,9 @@ class IncidentReport extends Model
     {
         return $this->belongsTo(ResponseTeam::class);
     }
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'reported_by');
+    }
+
 }

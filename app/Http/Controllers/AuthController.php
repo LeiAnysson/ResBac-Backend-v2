@@ -9,6 +9,7 @@ use Laravel\Sanctum\HasApiTokens;
 use App\Models\User;
 use Carbon\Carbon;
 use App\Models\Role;
+use App\Helpers\activity_logger;
 
 class AuthController extends Controller
 {
@@ -52,6 +53,8 @@ class AuthController extends Controller
             'address' => $request->address,
             'birthdate' => $request->birthdate,
         ]);
+        
+        recordActivity('registered', 'Account' . $user->id);
 
         return response()->json([
             'message' => 'Registration successful',
@@ -75,14 +78,22 @@ class AuthController extends Controller
 
         $token = $user->createToken('resbac-token')->plainTextToken;
 
+        recordActivity('logged in', 'Account' , $user->id);
+
         return response()->json([
             'message' => 'Login successful',
             'token' => $token,
             'user' => [
                 'id' => $user->id,
-                'name' => $user->name,
+                'name' => $user->first_name . ' ' . $user->last_name,
                 'email' => $user->email,
                 'role_id' => $user->role_id,
+                'role' => $user->role
+                    ? [
+                        'id' => $user->role->id,
+                        'name' => $user->role->name,
+                    ]
+                    : null,
             ],
         ], 200);
     }
@@ -97,12 +108,25 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        if ($request->user() && $request->user()->currentAccessToken()) {
-            $request->user()->currentAccessToken()->forceFill([
+        $user = $request->user()->load('role');
+
+        if ($user && $user->currentAccessToken()) {
+            $user->currentAccessToken()->forceFill([
                 'last_used_at' => now()
             ])->save();
         }
 
-        return response()->json($request->user());
+        $user->name = $user->first_name . ' ' . $user->last_name;
+
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role_id' => $user->role_id,
+            'role' => $user->role ? [
+                'id' => $user->role->id,
+                'name' => $user->role->name,
+            ] : null,
+        ]);
     }
 }

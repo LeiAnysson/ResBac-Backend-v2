@@ -13,6 +13,11 @@ class ResponseTeam extends Model
         return $this->hasMany(ResponseTeamMember::class, 'team_id');
     }
 
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
     public function incidentReports()
     {
         return $this->hasMany(IncidentReport::class);

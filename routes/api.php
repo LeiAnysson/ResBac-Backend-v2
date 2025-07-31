@@ -1,11 +1,14 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\OCRController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdminResidentController;
 use App\Http\Controllers\IncidentReportController;
+use App\Http\Controllers\ResponseTeamController;
+use Illuminate\Http\Request;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -13,6 +16,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
 Route::post('/ocr-upload', [OCRController::class, 'upload']);
+
+//-------------------- navbar profile
+
+Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
 
 //--------------------
 
@@ -31,3 +38,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 Route::get('/admin/incidents', [IncidentReportController::class, 'index']);
 Route::get('/admin/incidents/{id}', [IncidentReportController::class, 'show']);
+
+//---------------------
+
+Route::get('/admin/teams', [ResponseTeamController::class, 'index']);
+
+//---------------------
+
+Route::get('/admin/activity-logs', [ActivityLogController::class, 'index']);

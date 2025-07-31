@@ -22,13 +22,13 @@ class User extends Authenticatable
         'address',
         'contact_num',
         'role_id',
+        'created_at',
         'residency_status',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
-        'created_at', 
         'updated_at'
     ];
 
