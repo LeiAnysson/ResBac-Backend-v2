@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\IncidentReport;
+use Carbon\Carbon;
 
 class IncidentReportController extends Controller
 {
@@ -32,5 +33,17 @@ class IncidentReportController extends Controller
         }
 
         return response()->json($incident);
+    }
+
+    public function reportsResolvedThisWeek()
+    {
+        $count = IncidentReport::where('status', 'resolved')
+            ->whereBetween('updated_at', [
+                Carbon::now()->startOfWeek(), 
+                Carbon::now()->endOfWeek(),
+            ])
+            ->count();
+
+        return response()->json(['weekly_reports' => $count]);
     }
 }

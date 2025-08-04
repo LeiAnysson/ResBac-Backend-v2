@@ -26,18 +26,23 @@ Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
 Route::get('/admin/users', [UserController::class, 'index']);
 Route::post('/admin/users/{id}/assign-role', [UserController::class, 'assignRole']);
 Route::post('/admin/users/create', [UserController::class, 'createAccount']);
+Route::get('/admin/users/total-users', [UserController::class, 'totalUsers']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/admin/residents', [AdminResidentController::class, 'index']);
     Route::post('/admin/residents/{id}/approve', [AdminResidentController::class, 'approve']);
     Route::post('/admin/residents/{id}/reject', [AdminResidentController::class, 'reject']);
     Route::get('/admin/residents/{id}', [AdminResidentController::class, 'show']);
+    Route::get('/admin/residents/pending-residents', [AdminResidentController::class, 'pendingResidentsCount']);
 });
+
+
 
 //---------------------
 
 Route::get('/admin/incidents', [IncidentReportController::class, 'index']);
 Route::get('/admin/incidents/{id}', [IncidentReportController::class, 'show']);
+Route::get('/admin/incidents/weekly-reports', [IncidentReportController::class, 'reportsResolvedThisWeek']);
 
 //---------------------
 

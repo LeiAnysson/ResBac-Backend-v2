@@ -9,6 +9,7 @@ use App\Mail\ResidencyApprovedMail;
 use App\Mail\ResidencyRejectedMail;
 use App\Models\ResidentProfile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class AdminResidentController extends Controller
 {
@@ -37,6 +38,15 @@ class AdminResidentController extends Controller
         $residents = $query->with('user')->paginate(10);
 
         return response()->json($residents);
+    }
+
+    public function pendingResidentsCount(Request $request)
+    {
+        $count = User::where('role_id', 4)->where('residency_status', 'pending')->count();
+        Log::info('pendingResidentsCount hit');
+        return response()->json([
+            'pending_residents' => $count
+        ]);
     }
 
     public function show($id)

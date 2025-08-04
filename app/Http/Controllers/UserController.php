@@ -24,6 +24,13 @@ class UserController extends Controller
 
         return response()->json($query->paginate(10));
     }
+
+    public function totalUsers()
+    {
+        $count = User::count();
+
+        return response()->json(['total_users' => $count]);
+    }
     
     public function assignRole(request $request, $id)
     {
@@ -87,10 +94,10 @@ class UserController extends Controller
             'user' => $user
         ]);
     }
-    public function pendingResidents()
-    {
-        $pending = User::whereHas('role', fn($q) => $q->where('name', 'resident'))
-                    ->where('residency_status', 'pending')->get();
-        return response()->json($pending);
-    }
+    // public function pendingResidents()
+    // {
+    //     $pending = User::whereHas('role', fn($q) => $q->where('name', 'resident'))
+    //                 ->where('residency_status', 'pending')->get();
+    //     return response()->json($pending);
+    // }
 }
