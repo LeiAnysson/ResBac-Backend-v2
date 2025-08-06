@@ -20,17 +20,23 @@ class AuthController extends Controller
             'last_name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
-            
             'birthdate' => 'nullable|date',
             'address' => 'nullable|string',
-            'id_number' => 'nullable|string',
-            'id_image_path' => 'nullable|string',
+            'id_image' => 'nullable|image|max:10240', 
+            'id_number' => 'nullable|string|max:255',
+            'contact_num' => 'nullable|string',
         ]);
+
         $residentRoleId = Role::where('name', 'Resident')->value('id');
 
         $age = null;
         if ($request->birthdate) {
             $age = Carbon::parse($request->birthdate)->age;
+        }
+
+        $idImagePath = null;
+        if ($request->hasFile('id_image')) {
+            $idImagePath = $request->file('id_image')->store('id_images', 'public');
         }
 
         $user = User::create([
@@ -42,19 +48,20 @@ class AuthController extends Controller
             'birthdate' => $request->birthdate,
             'address' => $request->address,
             'age' => $age,
-            'contact_num' => $request->contact_num ?? null,
+            'contact_num' => $request->contact_num,
+            'residency_status' => 'pending',
         ]);
 
         ResidentProfile::create([
             'user_id' => $user->id,
-            'id_number' => $request->id_number,
-            'id_image_path' => $request->id_image_path,
+            'id_image_path' => $idImagePath,
+            'id_number' => $request->id_number ?? '',
             'full_name' => $request->first_name . ' ' . $request->last_name,
             'address' => $request->address,
             'birthdate' => $request->birthdate,
         ]);
-        
-        recordActivity('registered', 'Account' . $user->id);
+
+        recordActivity('registered', 'Account ' . $user->id);
 
         return response()->json([
             'message' => 'Registration successful',
@@ -88,6 +95,7 @@ class AuthController extends Controller
                 'name' => $user->first_name . ' ' . $user->last_name,
                 'email' => $user->email,
                 'role_id' => $user->role_id,
+                'residency_status' => $user->residency_status,
                 'role' => $user->role
                     ? [
                         'id' => $user->role->id,
