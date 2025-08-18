@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ResBac Agora Test Call</title>
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+</head>
+<body>
+  <h2>ResBac Voice Call Test</h2>
+  <button id="joinBtn">Join Call</button>
+  <button id="leaveBtn">Leave Call</button>
+
+  <script>
+    const appID = '0cf0bb3a648c4c619c1ff941bc99dfe7';
+    const channelName = 'resbac_test_channel';
+    let token = null;
+    let client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    let localTrack;
+
+    async function fetchToken() {
+      const res = await fetch(`http://127.0.0.1:8000/api/agora/token?channel=${channelName}`);
+      const data = await res.json();
+      token = data.token;
+    }
+
+    document.getElementById('joinBtn').onclick = async () => {
+      await fetchToken();
+      await client.join(appID, channelName, token || null, null);
+      localTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      await client.publish([localTrack]);
+      console.log("Joined channel and publishing audio!");
+      client.on("user-published", async (user, mediaType) => {
+        await client.subscribe(user, mediaType);
+        if (mediaType === "audio") {
+          const remoteAudioTrack = user.audioTrack;
+          remoteAudioTrack.play();
+        }
+      });
+    };
+
+    document.getElementById('leaveBtn').onclick = async () => {
+      localTrack.close();
+      await client.leave();
+      console.log("Left channel");
+    };
+  </script>
+</body>
+</html>

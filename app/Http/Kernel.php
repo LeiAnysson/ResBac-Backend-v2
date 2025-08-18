@@ -12,6 +12,8 @@ class Kernel extends HttpKernel
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         \Illuminate\Http\Middleware\HandleCors::class,
+        \App\Http\Middleware\RequestDecryptionMiddleware::class,
+        \App\Http\Middleware\ResponseEncryptionMiddleware::class,
     ];
 
     protected $middlewareGroups = [
@@ -40,5 +42,8 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'adminOnly' => \App\Http\Middleware\IsAdmin::class,
+        'request.decrypt' => \App\Http\Middleware\RequestDecryptionMiddleware::class,
+        'response.encrypt' => \App\Http\Middleware\ResponseEncryptionMiddleware::class,
+        'role' => \App\Http\Middleware\RoleMiddleware::class,
     ];
 }

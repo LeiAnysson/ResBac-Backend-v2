@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use App\Models\Role;
 use App\Helpers\activity_logger;
+use App\Helpers\CryptoHelper;
 
 class AuthController extends Controller
 {
@@ -72,20 +73,18 @@ class AuthController extends Controller
     {
         $request->validate([
             'email' => 'required|email',
-            'password' => 'required|string',
+            'password' => 'required|string'
         ]);
 
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'message' => 'Invalid email or password',
-            ], 401);
+            return response()->json(['message' => 'Invalid email or password'], 401);
         }
 
         $token = $user->createToken('resbac-token')->plainTextToken;
 
-        recordActivity('logged in', 'Account' , $user->id);
+        recordActivity('logged in', 'Account', $user->id);
 
         return response()->json([
             'message' => 'Login successful',

@@ -47,53 +47,62 @@ class UserController extends Controller
         return response()->json(['message' => 'Role updated successfully']);
     }
 
-    public function createAccount(request $request)
+    public function createAccount(Request $request)
     {
-        $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:6',
-            'age' => 'required|integer|min:18',
-            'birthdate' => 'required|date',
-            'address' => 'required|string|max:255',
-            'contact_num' => 'required|string|max:15',
-            'role' => 'required|in:Responder,MDRRMO',
-            'team_id' => 'nullable|exists:response_teams,id'
+        $validated = $request->validate([
+            'first_name'   => 'required|string|max:255',
+            'last_name'    => 'required|string|max:255',
+            'email'        => 'required|email|unique:users',
+            'password'     => 'required|string|min:6',
+            'age'          => 'required|integer|min:18',
+            'birthdate'    => 'required|date',
+            'address'      => 'required|string|max:255',
+            'contact_num'  => 'required|string|max:15',
+            'role'         => 'required|in:Resident,Responder,MDRRMO',
+            'team_id'      => 'nullable|exists:response_teams,id'
         ]);
 
-        $role = Role::where('name', $request->role)->first();
+        $role = Role::where('name', $validated['role'])->firstOrFail();
 
-        if ($request->role === 'Responder' && !$request->team_id) {
+        if ($validated['role'] === 'Responder' && empty($validated['team_id'])) {
             return response()->json([
                 'message' => 'team_id is required for Responders.'
             ], 422);
         }
 
+        $residencyStatus = match ($validated['role']) {
+            'Resident'  => 'pending',
+            'Responder', 'MDRRMO' => 'N/A',
+            default     => 'N/A'
+        };
+
         $user = User::create([
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'age' => $request->age,
-            'birthdate' => $request->birthdate,
-            'address' => $request->address,
-            'contact_num' => $request->contact_num,
-            'role_id' => $role->id,
+            'first_name'       => $validated['first_name'],
+            'last_name'        => $validated['last_name'],
+            'email'            => $validated['email'],
+            'password'         => Hash::make($validated['password']),
+            'age'              => $validated['age'],
+            'birthdate'        => $validated['birthdate'],
+            'address'          => $validated['address'],
+            'contact_num'      => $validated['contact_num'],
+            'role_id'          => $role->id,
+            'residency_status' => $residencyStatus,
         ]);
 
-        if ($request->role === 'Responder') {
+        if ($validated['role'] === 'Responder') {
             ResponseTeamMember::create([
-                'team_id' => $request->team_id,
+                'team_id' => $validated['team_id'],
                 'user_id' => $user->id,
             ]);
         }
 
         return response()->json([
-            'message' => $request->role . ' account created successfully',
-            'user' => $user
-        ]);
+            'message' => $validated['role'] . ' account created successfully',
+            'user'    => $user
+        ], 201);
     }
+
+    // dashboard data  (still not working T.T)
     // public function pendingResidents()
     // {
     //     $pending = User::whereHas('role', fn($q) => $q->where('name', 'resident'))

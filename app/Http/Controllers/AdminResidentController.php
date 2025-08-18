@@ -10,18 +10,12 @@ use App\Mail\ResidencyRejectedMail;
 use App\Models\ResidentProfile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class AdminResidentController extends Controller
 {
     public function index(Request $request)
     {   
-        /** @var User $user */
-        $user = Auth::user();
-
-        if (!$user || !$user->hasRole('admin')) {
-            return response()->json(['message' => 'Forbidden: Admins only'], 403);
-        }
-
         $query = ResidentProfile::query();
 
         if ($request->has('residency_status')) {
@@ -51,13 +45,6 @@ class AdminResidentController extends Controller
 
     public function show($id)
     {
-        /** @var User $user */
-        $user = Auth::user();
-
-        if (!$user || !$user->hasRole('admin')) {
-            return response()->json(['message' => 'Forbidden: Admins only'], 403);
-        }
-
         $resident = User::with('residentProfile')
             ->where('role_id', 4)->where('id', $id)->first();
         
@@ -65,48 +52,75 @@ class AdminResidentController extends Controller
             return response()->json(['message' => 'Resident not found'], 404);
         }
 
-        return response()->json($resident);
+        return response()->json([
+            'id'        => $resident->id,
+            'name'      => trim($resident->first_name . ' ' . $resident->last_name),
+            'email'     => $resident->email,
+            'birthdate' => $resident->birthdate,
+            'address'   => $resident->address,
+            'status'    => $resident->residency_status,
+            'resident_profile' => [
+                'id_image_path' => $resident->residentProfile->id_image_path ?? null,
+                'id_number'     => $resident->residentProfile->id_number ?? null,
+            ]
+        ]);
     }
 
     public function approve($id)
-    {   
-        /** @var User $user */
-        $user = Auth::user();
+    {
+        DB::beginTransaction();
 
-        if (!$user || !$user->hasRole('admin')) {
-            return response()->json(['message' => 'Forbidden: Admins only'], 403);
+        try {
+            $user = User::findOrFail($id);
+            $user->residency_status = 'approved';
+            $user->save();
+
+            recordActivity('approved residency request', 'User', $user->id);
+
+            // Mail::to($user->email)->send(new ResidencyApprovedMail($user));
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'User approved successfully.',
+                'email_sent_to' => $user->email,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'error' => 'Approval failed.',
+                'details' => $e->getMessage(),
+            ], 500);
         }
-
-        $user = User::findOrFail($id);
-        $user->residency_status = 'approved';
-        $user->save();
-
-        //Mail::to($user->email)->send(new ResidencyApprovedMail($user));
-
-        return response()->json([
-            'message' => 'User approved and email sent.',
-            'email_sent_to' => $user->email,
-        ]);
     }
 
     public function reject($id)
-    {   
-        /** @var User $user */
-        $user = Auth::user();
+    {
+        DB::beginTransaction();
 
-        if (!$user || !$user->hasRole('admin')) {
-            return response()->json(['message' => 'Forbidden: Admins only'], 403);
+        try {
+            $user = User::findOrFail($id);
+            $user->residency_status = 'rejected';
+            $user->save();
+
+            recordActivity('rejected residency request', 'User', $user->id);
+
+            // Mail::to($user->email)->send(new ResidencyRejectedMail($user));
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'User rejected successfully.',
+                'email_sent_to' => $user->email,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'error' => 'Rejection failed.',
+                'details' => $e->getMessage(),
+            ], 500);
         }
-
-        $user = User::findOrFail($id);
-        $user->residency_status = 'rejected';
-        $user->save();
-
-        //Mail::to($user->email)->send(new ResidencyApprovedMail($user));
-
-        return response()->json([
-            'message' => 'User rejected and email sent.',
-            'email_sent_to' => $user->email,
-        ]);
     }
 }

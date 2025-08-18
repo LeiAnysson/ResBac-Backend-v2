@@ -11,7 +11,7 @@ class RedirectIfAuthenticated
     public function handle(Request $request, Closure $next, ...$guards)
     {
         if (Auth::guard()->check()) {
-            return redirect('/home');
+            return response()->json(['message' => 'Already authenticated'], 403);
         }
 
         return $next($request);
