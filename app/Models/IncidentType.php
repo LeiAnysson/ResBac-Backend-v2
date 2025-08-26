@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\IncidentPriority;
 
 class IncidentType extends Model
 {
@@ -20,4 +21,9 @@ class IncidentType extends Model
     {
         return $this->hasMany(IncidentReport::class, 'incident_type_id');
     }
+    public function priority()
+    {
+        return $this->belongsTo(IncidentPriority::class, 'priority_id');
+    }
+
 }
