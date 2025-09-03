@@ -2,10 +2,27 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\IncidentReportController;
+use App\Http\Controllers\IncidentCallerController;
+use App\Http\Controllers\IncidentUpdateController;
+use App\Http\Controllers\ResponseTeamAssignmentController;
 
-Route::middleware(['auth:sanctum', 'role:Admin'])->group(function () {
-    Route::get('/admin/incidents', [IncidentReportController::class, 'index']);
-    Route::get('/admin/incidents/{id}', [IncidentReportController::class, 'show']);
-    Route::get('/admin/incidents/weekly-reports', [IncidentReportController::class, 'reportsResolvedThisWeek']);
+Route::middleware(['auth:sanctum', 'role:Admin,MDRRMO'])->group(function () {
+    Route::get('/incidents', [IncidentReportController::class, 'index']);
+    Route::get('/incidents/{id}', [IncidentReportController::class, 'show']);
+    Route::get('/incidents/weekly-reports', [IncidentReportController::class, 'reportsResolvedThisWeek']);
 });
+
+Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {
+    Route::post('incidents/{incident_id}/callers', [IncidentCallerController::class, 'store']);
+    Route::post('incidents/{incident_id}/updates', [IncidentUpdateController::class, 'store']);
+    Route::post('incidents/calls/accept', [IncidentReportController::class, 'acceptCall']);
+    Route::post('incidents/{id}/assign-team', [ResponseTeamAssignmentController::class, 'store']);
+    Route::put('incidents/team-assignments/{id}', [ResponseTeamAssignmentController::class, 'update']);
+    Route::get('incidents/active', [IncidentReportController::class, 'getActiveIncidents']);
+});
+
+Route::middleware(['auth:sanctum', 'role:Resident'])->group(function () {
+    Route::post('incidents/from-resident', [IncidentReportController::class, 'storeFromResident']);
+});
+
 

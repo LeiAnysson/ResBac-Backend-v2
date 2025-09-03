@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AgoraController;
+use App\Http\Controllers\GeocodeController;
 
 Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {
-    Route::get('/agora/token', [AgoraController::class, 'generateToken']);
+    Route::post('/geocode', [GeocodeController::class, 'geocode']);
 });

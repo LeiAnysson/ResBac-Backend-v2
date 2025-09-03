@@ -22,4 +22,10 @@ class ResponseTeam extends Model
     {
         return $this->hasMany(IncidentReport::class);
     }
+
+    public function assignments()
+    {
+        return $this->hasMany(ResponseTeamAssignment::class, 'team_id');
+    }
+
 }

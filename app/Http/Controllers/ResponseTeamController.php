@@ -8,6 +8,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use App\Models\ResponseTeamMember;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 
 class ResponseTeamController extends Controller
 {
@@ -119,5 +121,48 @@ class ResponseTeamController extends Controller
                 'message' => 'Member removed successfully',
             ]);
         });
+    }
+
+    public function setRotationStartDate(Request $req)
+    {
+        $data = $req->validate([
+            'rotation_start_date' => 'required|date',
+            'rotation_start_team' => 'nullable|string|in:Alpha,Bravo,Charlie',
+        ]);
+
+        Cache::put('rotation_start_date', $data['rotation_start_date']);
+        if (!empty($data['rotation_start_team'])) {
+            Cache::put('rotation_start_team', $data['rotation_start_team']);
+        }
+
+        return response()->json(['message' => 'Rotation start date updated.']);
+    }
+
+    public function rotateTeams()
+    {
+        $startDateStr = Cache::get('rotation_start_date', Carbon::today()->toDateString());
+        $startTeam = Cache::get('rotation_start_team', 'Alpha');
+
+        $startDate = Carbon::parse($startDateStr)->startOfDay();
+        $teamsOrder = ['Alpha','Bravo','Charlie'];
+
+        $startIndex = array_search($startTeam, $teamsOrder);
+        if ($startIndex === false) $startIndex = 0;
+
+        $daysPassed = $startDate->diffInDays(Carbon::today());
+        $currentIndex = ($startIndex + $daysPassed) % count($teamsOrder);
+        $currentTeamName = $teamsOrder[$currentIndex];
+
+        ResponseTeam::whereIn('name', $teamsOrder)->update(['status' => 'unavailable']);
+
+        $currentTeam = ResponseTeam::where('name', $currentTeamName)->first();
+        if ($currentTeam) {
+            $currentTeam->update(['status' => 'available']);
+        }
+
+        return response()->json([
+            'message' => 'Rotation applied.',
+            'available_team' => $currentTeamName,
+        ]);
     }
 }
