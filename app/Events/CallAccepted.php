@@ -26,9 +26,26 @@ class CallAccepted implements ShouldBroadcast
         return new PrivateChannel('resident.' . $this->report->reported_by);
     }
 
-
     public function broadcastAs()
     {
         return 'CallAccepted';
     }
+
+    public function broadcastWith()
+    {
+        return [
+            'id' => $this->report->id,
+            'incident_type' => [
+                'id' => $this->report->incidentType->id,
+                'name' => $this->report->incidentType->name,
+            ],
+            'status' => $this->report->status,
+            'user' => [
+                'id' => $this->report->user->id,
+                'first_name' => $this->report->user->first_name,
+                'last_name' => $this->report->user->last_name,
+            ],
+        ];
+    }
+
 }

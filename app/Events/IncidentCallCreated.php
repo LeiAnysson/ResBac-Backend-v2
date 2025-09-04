@@ -21,12 +21,36 @@ class IncidentCallCreated implements ShouldBroadcast
     {
         $this->report = $report->load('incidentType', 'user');
     }
+    
     public function broadcastOn()
     {
         return new Channel('dispatcher-channel');
     }
+
     public function broadcastAs()
     {
         return 'IncidentCallCreated';
     }
+
+    public function broadcastWith()
+    {
+        return [
+            'id' => $this->report->id,
+            'incident_type' => [
+                'id' => $this->report->incidentType->id,
+                'name' => $this->report->incidentType->name,
+            ],
+            'user' => [
+                'id' => $this->report->user->id,
+                'first_name' => $this->report->user->first_name,
+                'last_name' => $this->report->user->last_name,
+            ],
+            'status' => $this->report->status,
+            'latitude' => $this->report->latitude,
+            'longitude' => $this->report->longitude,
+            'landmark' => $this->report->landmark,
+            'description' => $this->report->description,
+        ];
+    }
+
 }

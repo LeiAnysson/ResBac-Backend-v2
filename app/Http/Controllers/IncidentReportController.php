@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\GeocodeController;
 use App\Events\IncidentCallCreated;
 use App\Events\CallAccepted;
+use Ably\AblyRest;
 
 class IncidentReportController extends Controller
 {
@@ -52,12 +53,28 @@ class IncidentReportController extends Controller
             $incident->status = 'Accepted';
             $incident->save();
 
-            broadcast(new CallAccepted($incident))->toOthers();
+            $ably = new AblyRest(env('ABLY_KEY'));
+            $channel = $ably->channel('dispatcher-channel');
+
+            $channel->publish('CallAccepted', [
+                'id' => $incident->id,
+                'incident_type' => [
+                    'id' => $incident->incidentType->id,
+                    'name' => $incident->incidentType->name
+                ],
+                'user' => [
+                    'id' => $incident->user->id,
+                    'first_name' => $incident->user->first_name,
+                    'last_name' => $incident->user->last_name
+                ],
+                'status' => $incident->status,
+            ]);
 
             return response()->json([
                 'message' => 'Call accepted successfully',
                 'incident' => $incident,
             ], 200);
+
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -93,7 +110,27 @@ class IncidentReportController extends Controller
                 'priority_id'      => null,
             ]);
 
-            event(new IncidentCallCreated($incident));
+            $ably = new AblyRest(env('ABLY_KEY'));
+            $channel = $ably->channel('dispatcher-channel');
+
+            $channel->publish('IncidentCallCreated', [
+                'id' => $incident->id,
+                'incident_type' => [
+                    'id' => $incident->incidentType->id,
+                    'name' => $incident->incidentType->name
+                ],
+                'user' => [
+                    'id' => $incident->user->id,
+                    'first_name' => $incident->user->first_name,
+                    'last_name' => $incident->user->last_name
+                ],
+                'status' => $incident->status,
+                'latitude' => $incident->latitude,
+                'longitude' => $incident->longitude,
+                'landmark' => $incident->landmark,
+                'description' => $incident->description,
+            ]);
+
 
             $team = ResponseTeam::where('status', 'Available')->first();
             if ($team) {
