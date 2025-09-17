@@ -16,6 +16,7 @@ Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {
     Route::post('incidents/{incident_id}/callers', [IncidentCallerController::class, 'store']);
     Route::post('incidents/{incident_id}/updates', [IncidentUpdateController::class, 'store']);
     Route::post('incidents/calls/accept/{incident_id}', [IncidentReportController::class, 'acceptCall']);
+    Route::get('incidents/active-calls', [IncidentReportController::class, 'fetchActiveCalls']);
     Route::post('incidents/{id}/assign-team', [ResponseTeamAssignmentController::class, 'store']);
     Route::put('incidents/team-assignments/{id}', [ResponseTeamAssignmentController::class, 'update']);
     Route::get('incidents/active', [IncidentReportController::class, 'getActiveIncidents']);

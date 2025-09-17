@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "23dff82e4670afd17cc7fa17c97478c3",
+    "content-hash": "f8d898f4cb186778927c5738e4e2d128",
     "packages": [
         {
             "name": "ably/ably-php",
@@ -58,6 +58,65 @@
                 "source": "https://github.com/ably/ably-php/tree/1.1.11"
             },
             "time": "2025-03-07T13:02:01+00:00"
+        },
+        {
+            "name": "ably/laravel-broadcaster",
+            "version": "v1.0.7",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ably/laravel-broadcaster.git",
+                "reference": "1a1259f4718005af0af0362a45a815358bd78e52"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ably/laravel-broadcaster/zipball/1a1259f4718005af0af0362a45a815358bd78e52",
+                "reference": "1a1259f4718005af0af0362a45a815358bd78e52",
+                "shasum": ""
+            },
+            "require": {
+                "ably/ably-php": "^1.1",
+                "ext-json": "*",
+                "illuminate/support": "^6.0 || ^7.0 || ^8.0 || ^9.0 || ^10.0 || ^11.0 || ^12.0",
+                "php": "^7.2 || ^8.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "4.* || 8.* || 9.* || 10.*",
+                "phpunit/phpunit": "^8.5 || ^9.5 || ^10.0 || ^11.0 || ^12.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Ably\\LaravelBroadcaster\\LaravelAblyBroadcasterServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Ably\\LaravelBroadcaster\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
+                {
+                    "name": "Ably",
+                    "email": "support@ably.io"
+                }
+            ],
+            "description": "An Ably broadcaster for Laravel",
+            "homepage": "https://github.com/ably/laravel-broadcaster",
+            "keywords": [
+                "ably",
+                "laravel-broadcaster"
+            ],
+            "support": {
+                "issues": "https://github.com/ably/laravel-broadcaster/issues",
+                "source": "https://github.com/ably/laravel-broadcaster/tree/v1.0.7"
+            },
+            "time": "2025-02-26T10:06:08+00:00"
         },
         {
             "name": "brick/math",

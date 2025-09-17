@@ -13,7 +13,7 @@ class AgoraController extends Controller
     public function generateToken(Request $request)
     {
         $channelName = $request->get('channel', 'resbac_channel');
-        $uid = intval($request->get('uid', 0));
+        $uid = intval($request->get('uid', rand(10000, 99999)));
         $expirySeconds = intval($request->get('expiry', 3600));
 
         $appID = env('AGORA_APP_ID');
@@ -21,6 +21,7 @@ class AgoraController extends Controller
 
         if (empty($appCertificate)) {
             return response()->json([
+                'appID' => $appID,
                 'token' => null,
                 'channelName' => $channelName,
                 'uid' => $uid,
@@ -28,7 +29,7 @@ class AgoraController extends Controller
             ]);
         }
 
-        $currentTimestamp = now()->timestamp;
+        $currentTimestamp = time();
         $privilegeExpiredTs = $currentTimestamp + $expirySeconds;
 
         $client = new Agora($appID, $appCertificate);
@@ -42,6 +43,7 @@ class AgoraController extends Controller
         $token = RtcToken::buildTokenWithUid($client, $user);
 
         return response()->json([
+            'appID' => $appID,
             'token' => $token,
             'channelName' => $channelName,
             'uid' => $uid,

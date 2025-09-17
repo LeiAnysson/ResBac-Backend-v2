@@ -2,7 +2,6 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -18,7 +17,7 @@ class CallAccepted implements ShouldBroadcast
 
     public function __construct(IncidentReport $report)
     {
-        $this->report = $report;
+        $this->report = $report->load('incidentType', 'user');
     }
 
     public function broadcastOn()
@@ -36,16 +35,15 @@ class CallAccepted implements ShouldBroadcast
         return [
             'id' => $this->report->id,
             'incident_type' => [
-                'id' => $this->report->incidentType->id,
+                'id'   => $this->report->incidentType->id,
                 'name' => $this->report->incidentType->name,
             ],
             'status' => $this->report->status,
             'user' => [
-                'id' => $this->report->user->id,
+                'id'         => $this->report->user->id,
                 'first_name' => $this->report->user->first_name,
-                'last_name' => $this->report->user->last_name,
+                'last_name'  => $this->report->user->last_name,
             ],
         ];
     }
-
 }

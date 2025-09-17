@@ -13,7 +13,10 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\GeocodeController;
 use App\Events\IncidentCallCreated;
 use App\Events\CallAccepted;
+use App\Events\CallAcknowledged;
 use Ably\AblyRest;
+use Illuminate\Support\Facades\Log;
+use App\Events\NotificationEvent;
 
 class IncidentReportController extends Controller
 {
@@ -48,27 +51,17 @@ class IncidentReportController extends Controller
     {
         try {
             $userId = Auth::id(); 
-            $incident = IncidentReport::findOrFail($incidentId);
+            $incident = IncidentReport::with('incidentType', 'user')->findOrFail($incidentId);
 
             $incident->status = 'Accepted';
             $incident->save();
 
-            $ably = new AblyRest(env('ABLY_KEY'));
-            $channel = $ably->channel('dispatcher-channel');
+            broadcast(new NotificationEvent(
+                "resident.{$incident->user->id}", 
+                "Your incident report ({$incident->incidentType->name}) was accepted."
+            ));
 
-            $channel->publish('CallAccepted', [
-                'id' => $incident->id,
-                'incident_type' => [
-                    'id' => $incident->incidentType->id,
-                    'name' => $incident->incidentType->name
-                ],
-                'user' => [
-                    'id' => $incident->user->id,
-                    'first_name' => $incident->user->first_name,
-                    'last_name' => $incident->user->last_name
-                ],
-                'status' => $incident->status,
-            ]);
+            broadcast(new CallAccepted($incident));
 
             return response()->json([
                 'message' => 'Call accepted successfully',
@@ -83,6 +76,7 @@ class IncidentReportController extends Controller
     public function storeFromResident(Request $request)
     {
         DB::beginTransaction();
+        Log::info("storeFromResident method HIT");
 
         try {
             $userId = Auth::id(); 
@@ -110,27 +104,14 @@ class IncidentReportController extends Controller
                 'priority_id'      => null,
             ]);
 
-            $ably = new AblyRest(env('ABLY_KEY'));
-            $channel = $ably->channel('dispatcher-channel');
+            broadcast(new NotificationEvent(
+                "dispatcher-channel",
+                "Incoming emergency call: {$incident->incidentType->name} reported"
+            ));
 
-            $channel->publish('IncidentCallCreated', [
-                'id' => $incident->id,
-                'incident_type' => [
-                    'id' => $incident->incidentType->id,
-                    'name' => $incident->incidentType->name
-                ],
-                'user' => [
-                    'id' => $incident->user->id,
-                    'first_name' => $incident->user->first_name,
-                    'last_name' => $incident->user->last_name
-                ],
-                'status' => $incident->status,
-                'latitude' => $incident->latitude,
-                'longitude' => $incident->longitude,
-                'landmark' => $incident->landmark,
-                'description' => $incident->description,
-            ]);
 
+            Log::info("IncidentCallCreated DISPATCHED", ['incident_id' => $incident->id]);
+            broadcast(new IncidentCallCreated($incident));
 
             $team = ResponseTeam::where('status', 'Available')->first();
             if ($team) {

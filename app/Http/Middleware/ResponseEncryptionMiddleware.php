@@ -15,6 +15,10 @@ class ResponseEncryptionMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
+        if ($request->is('api/broadcasting/auth')) {
+            return $next($request);
+        }
+        
         $response = $next($request);
 
         $response->headers->set('X-Processed-By-AdminMiddleware', 'true');

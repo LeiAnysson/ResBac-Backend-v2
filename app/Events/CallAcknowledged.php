@@ -2,15 +2,14 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use App\Models\IncidentReport;
-use Illuminate\Support\Facades\Log;
 
-class IncidentCallCreated implements ShouldBroadcast
+class CallAcknowledged implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -23,13 +22,12 @@ class IncidentCallCreated implements ShouldBroadcast
 
     public function broadcastOn()
     {
-        Log::info("Broadcasting to channel", ['channel' => 'dispatcher-channel']);
-        return new PrivateChannel('dispatcher-channel');
+        return new Channel('dispatcher-channel');
     }
 
     public function broadcastAs()
     {
-        return 'IncidentCallCreated';
+        return 'CallAcknowledged';
     }
 
     public function broadcastWith()
@@ -37,19 +35,15 @@ class IncidentCallCreated implements ShouldBroadcast
         return [
             'id' => $this->report->id,
             'incident_type' => [
-                'id'   => $this->report->incidentType->id,
+                'id' => $this->report->incidentType->id,
                 'name' => $this->report->incidentType->name,
             ],
+            'status' => $this->report->status,
             'user' => [
-                'id'         => $this->report->user->id,
+                'id' => $this->report->user->id,
                 'first_name' => $this->report->user->first_name,
-                'last_name'  => $this->report->user->last_name,
+                'last_name' => $this->report->user->last_name,
             ],
-            'status'     => $this->report->status,
-            'latitude'   => $this->report->latitude,
-            'longitude'  => $this->report->longitude,
-            'landmark'   => $this->report->landmark,
-            'description'=> $this->report->description,
         ];
     }
 }
