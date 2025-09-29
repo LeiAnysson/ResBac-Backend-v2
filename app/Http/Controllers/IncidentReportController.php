@@ -13,10 +13,13 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\GeocodeController;
 use App\Events\IncidentCallCreated;
 use App\Events\CallAccepted;
-use App\Events\CallAcknowledged;
-use Ably\AblyRest;
 use Illuminate\Support\Facades\Log;
 use App\Events\NotificationEvent;
+use App\Events\CallEnded;
+use Peterujah\Agora\Agora;
+use Peterujah\Agora\User;
+use Peterujah\Agora\Roles;
+use Peterujah\Agora\Builders\RtcToken;
 
 class IncidentReportController extends Controller
 {
@@ -50,22 +53,56 @@ class IncidentReportController extends Controller
     public function acceptCall($incidentId)
     {
         try {
-            $userId = Auth::id(); 
             $incident = IncidentReport::with('incidentType', 'user')->findOrFail($incidentId);
-
             $incident->status = 'Accepted';
             $incident->save();
 
-            broadcast(new NotificationEvent(
-                "resident.{$incident->user->id}", 
-                "Your incident report ({$incident->incidentType->name}) was accepted."
-            ));
+            $channelName = "resident";
+            $appID = env('AGORA_APP_ID');
+            $appCertificate = env('AGORA_APP_CERTIFICATE');
+            $expirySeconds = 3600;
+            $privilegeExpiredTs = time() + $expirySeconds;
 
-            broadcast(new CallAccepted($incident));
+            $uidDispatcher = random_int(100000, 999999);
+            $uidResident = random_int(100000, 999999);
+            while ($uidResident === $uidDispatcher) {
+                $uidResident = random_int(100000, 999999);
+            }
+
+            $client = new Agora($appID, $appCertificate);
+            $client->setExpiration($privilegeExpiredTs);
+
+            $dispatcherUser = (new User($uidDispatcher))
+                ->setChannel($channelName)
+                ->setRole(Roles::RTC_ATTENDEE)
+                ->setPrivilegeExpire($privilegeExpiredTs);
+
+            $tokenDispatcher = RtcToken::buildTokenWithUid($client, $dispatcherUser);
+
+            $residentUser = (new User($uidResident))
+                ->setChannel($channelName)
+                ->setRole(Roles::RTC_ATTENDEE)
+                ->setPrivilegeExpire($privilegeExpiredTs);
+
+            $tokenResident = RtcToken::buildTokenWithUid($client, $residentUser);
+
+            $agoraResident = [
+                'appID' => $appID,
+                'token' => $tokenResident,
+                'channelName' => $channelName,
+                'uid' => $uidResident,
+            ];
+            broadcast(new CallAccepted($incident, $agoraResident));
 
             return response()->json([
                 'message' => 'Call accepted successfully',
                 'incident' => $incident,
+                'agora' => [
+                    'appID' => $appID,
+                    'token' => $tokenDispatcher,
+                    'channelName' => $channelName,
+                    'uid' => $uidDispatcher,
+                ],
             ], 200);
 
         } catch (\Exception $e) {
@@ -73,13 +110,15 @@ class IncidentReportController extends Controller
         }
     }
 
+
     public function storeFromResident(Request $request)
     {
         DB::beginTransaction();
         Log::info("storeFromResident method HIT");
 
         try {
-            $userId = Auth::id(); 
+            $userId = Auth::id();
+            $user = Auth::user();
 
             $validated = $request->validate([
                 'incident_type_id' => 'required|exists:incident_types,id',
@@ -93,6 +132,12 @@ class IncidentReportController extends Controller
             $latitude  = $validated['latitude'] ?? null;
             $longitude = $validated['longitude'] ?? null;
 
+            $incidentType = \App\Models\IncidentType::findOrFail($validated['incident_type_id']);
+            $priorityId   = $incidentType->priority_id ?? null;
+
+            Log::info('Payload:', $validated);
+            Log::info('IncidentType:', ['id' => $incidentType->id, 'priority_id' => $priorityId]);
+
             $incident = IncidentReport::create([
                 'incident_type_id' => $validated['incident_type_id'],
                 'description'      => $validated['description'] ?? null,
@@ -101,25 +146,48 @@ class IncidentReportController extends Controller
                 'landmark'         => $validated['landmark'] ?? null,
                 'status'           => 'Pending',
                 'reported_by'      => $userId,
-                'priority_id'      => null,
+                'caller_name'      => $user->first_name . ' ' . $user->last_name,
+                'priority_id'      => $priorityId,
             ]);
 
-            broadcast(new NotificationEvent(
-                "dispatcher-channel",
-                "Incoming emergency call: {$incident->incidentType->name} reported"
-            ));
+            try {
+                broadcast(new NotificationEvent(
+                    "dispatcher",
+                    "Incoming emergency call: {$incidentType->name} reported"
+                ));
+            } catch (\Exception $e) {
+                Log::error('NotificationEvent broadcast failed: ' . $e->getMessage());
+            }
 
+            try {
+                broadcast(new IncidentCallCreated($incident));
+            } catch (\Exception $e) {
+                Log::error('IncidentCallCreated broadcast failed: ' . $e->getMessage());
+            }
 
-            Log::info("IncidentCallCreated DISPATCHED", ['incident_id' => $incident->id]);
-            broadcast(new IncidentCallCreated($incident));
+            $assignedTeam = null;
 
-            $team = ResponseTeam::where('status', 'Available')->first();
-            if ($team) {
-                ResponseTeamAssignment::create([
-                    'incident_id' => $incident->id,
-                    'team_id'     => $team->id,
-                    'assigned_by' => $userId,
-                ]);
+            if (strtolower($incidentType->name) !== 'medical') {
+                $assignedTeam = ResponseTeam::where('status', 'available')->first();
+            } else {
+                $assignedTeam = ResponseTeam::where('team_name', 'Medical')->first();
+            }
+
+            $teamData = null;
+
+            if ($assignedTeam) {
+                try {
+                    ResponseTeamAssignment::create([
+                        'incident_id'   => $incident->id,
+                        'team_id'       => $assignedTeam->id,
+                        'dispatcher_id' => $userId,
+                        'status'        => 'assigned',
+                    ]);
+
+                    $teamData = $assignedTeam->only(['id', 'team_name', 'status']);
+                } catch (\Exception $e) {
+                    Log::error('ResponseTeamAssignment creation failed: ' . $e->getMessage());
+                }
             }
 
             DB::commit();
@@ -127,13 +195,29 @@ class IncidentReportController extends Controller
             return response()->json([
                 'message'  => 'Incident reported successfully',
                 'incident' => $incident,
-                'team'     => $team,
+                'team'     => $teamData,
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 500);
+            Log::error('storeFromResident failed: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to report incident. ' . $e->getMessage()
+            ], 500);
         }
+    }
+
+
+    public function endCall(Request $request, $incidentId)
+    {
+        $incident = IncidentReport::findOrFail($incidentId);
+        $user = Auth::user();
+
+        $endedBy = $user->role_id === 2 ? 'dispatcher' : 'resident';
+
+        broadcast(new CallEnded($incidentId, $endedBy));
+
+        return response()->json(['message' => ucfirst($endedBy).' ended the call']);
     }
 
     public function getActiveIncidents()

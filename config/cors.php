@@ -2,11 +2,11 @@
 
 return [
 
-    'paths' => ['api/*', 'ably-auth', 'broadcasting/*', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*', 'broadcasting/*', 'sanctum/csrf-cookie'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:3000'], 
+    'allowed_origins' => ['http://localhost:3000', 'https://resbac.kiri8tives.com'], 
 
     'allowed_origins_patterns' => [],
 

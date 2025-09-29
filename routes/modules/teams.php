@@ -9,7 +9,6 @@ Route::middleware(['auth:sanctum', 'role:Admin'])->prefix('admin/teams')->group(
     Route::post('/{id}/add-member', [ResponseTeamController::class, 'addMember']);
     Route::delete('/{teamId}/remove-member/{memberId}', [ResponseTeamController::class, 'removeMember']);
     Route::put('/rotation/start-date', [ResponseTeamController::class, 'setRotationStartDate']);
-    Route::post('/rotate', [ResponseTeamController::class, 'rotateTeams']);
 });
 
 Route::middleware(['auth:sanctum', 'role:Admin,MDRRMO'])->prefix('admin/teams')->group(function () {

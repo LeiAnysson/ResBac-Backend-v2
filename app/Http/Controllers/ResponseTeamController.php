@@ -137,32 +137,4 @@ class ResponseTeamController extends Controller
 
         return response()->json(['message' => 'Rotation start date updated.']);
     }
-
-    public function rotateTeams()
-    {
-        $startDateStr = Cache::get('rotation_start_date', Carbon::today()->toDateString());
-        $startTeam = Cache::get('rotation_start_team', 'Alpha');
-
-        $startDate = Carbon::parse($startDateStr)->startOfDay();
-        $teamsOrder = ['Alpha','Bravo','Charlie'];
-
-        $startIndex = array_search($startTeam, $teamsOrder);
-        if ($startIndex === false) $startIndex = 0;
-
-        $daysPassed = $startDate->diffInDays(Carbon::today());
-        $currentIndex = ($startIndex + $daysPassed) % count($teamsOrder);
-        $currentTeamName = $teamsOrder[$currentIndex];
-
-        ResponseTeam::whereIn('name', $teamsOrder)->update(['status' => 'unavailable']);
-
-        $currentTeam = ResponseTeam::where('name', $currentTeamName)->first();
-        if ($currentTeam) {
-            $currentTeam->update(['status' => 'available']);
-        }
-
-        return response()->json([
-            'message' => 'Rotation applied.',
-            'available_team' => $currentTeamName,
-        ]);
-    }
 }
