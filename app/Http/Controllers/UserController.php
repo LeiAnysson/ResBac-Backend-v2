@@ -22,6 +22,15 @@ class UserController extends Controller
             $query->where('residency_status', $request->residency_status);
         }
 
+        if ($request->has('search') && $request->search !== "") {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                ->orWhere('last_name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
         return response()->json($query->paginate(10));
     }
 

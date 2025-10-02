@@ -15,6 +15,8 @@ Route::middleware(['auth:sanctum', 'role:Admin,MDRRMO'])->group(function () {
 Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {
     Route::post('incidents/{incident_id}/callers', [IncidentCallerController::class, 'store']);
     Route::post('incidents/{incident_id}/updates', [IncidentUpdateController::class, 'store']);
+    Route::post('incidents/{incident}/mark-invalid', [IncidentReportController::class, 'markInvalid']);
+
 
     Route::post('incidents/calls/accept/{incident_id}', [IncidentReportController::class, 'acceptCall']);
     Route::post('incidents/calls/{incidentId}/end', [IncidentReportController::class, 'endCall']);

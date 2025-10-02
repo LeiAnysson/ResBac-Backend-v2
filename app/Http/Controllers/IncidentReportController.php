@@ -20,12 +20,15 @@ use Peterujah\Agora\Agora;
 use Peterujah\Agora\User;
 use Peterujah\Agora\Roles;
 use Peterujah\Agora\Builders\RtcToken;
+use App\Helpers\IncidentHelper;
+use App\Events\DuplicateReportCreated;
+use App\Events\IncidentAssigned;
 
 class IncidentReportController extends Controller
 {
     public function index(Request $request)
     {
-        $query = IncidentReport::with('incidentType');
+        $query = IncidentReport::with('incidentType')->orderBy('reported_at', 'desc');
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -35,8 +38,20 @@ class IncidentReportController extends Controller
             $query->where('incident_type_id', $request->incident_type_id);
         }
 
+        if ($request->has('search') && $request->search !== "") {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('id', 'like', "%{$search}%")
+                ->orWhereHas('incidentType', function($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })
+                ->orWhere('landmark', 'like', "%{$search}%");
+            });
+        }
+
         return response()->json($query->paginate(10));
     }
+    
     public function show($id)
     {
         $incident = IncidentReport::with(['incidentType', 'user']) 
@@ -137,6 +152,39 @@ class IncidentReportController extends Controller
 
             Log::info('Payload:', $validated);
             Log::info('IncidentType:', ['id' => $incidentType->id, 'priority_id' => $priorityId]);
+            
+            $duplicateIncident = IncidentHelper::checkDuplicateReport(
+                $validated['incident_type_id'], 
+                $latitude, 
+                $longitude
+            );
+
+            if ($duplicateIncident) {
+                IncidentHelper::addDuplicateReporter($duplicateIncident, $userId);
+
+                $dupPayload = [
+                    'incident_id'     => $duplicateIncident->id,
+                    'incident_type'   => $duplicateIncident->incidentType,
+                    'duplicate_count' => $duplicateIncident->duplicates 
+                        ? count(json_decode($duplicateIncident->duplicates, true))
+                        : 1,
+                ];
+
+                try {
+                    broadcast(new DuplicateReportCreated($dupPayload));
+                } catch (\Exception $e) {
+                    Log::error('DuplicateReportCreated broadcast failed: ' . $e->getMessage());
+                }
+
+                return response()->json([
+                    'message' => 'Duplicate report detected. Dispatcher notified.',
+                    'duplicate_of' => $duplicateIncident->id,
+                    'duplicates' => $duplicateIncident->duplicates 
+                        ? json_decode($duplicateIncident->duplicates, true) 
+                        : []
+                ], 200);
+            }
+
 
             $incident = IncidentReport::create([
                 'incident_type_id' => $validated['incident_type_id'],
@@ -190,6 +238,12 @@ class IncidentReportController extends Controller
                 }
             }
 
+            try {
+                broadcast(new IncidentAssigned($incident, $assignedTeam));
+            } catch (\Exception $e) {
+                Log::error('IncidentAssigned broadcast failed: ' . $e->getMessage());
+            }
+
             DB::commit();
 
             return response()->json([
@@ -219,6 +273,19 @@ class IncidentReportController extends Controller
 
         return response()->json(['message' => ucfirst($endedBy).' ended the call']);
     }
+
+    public function markInvalid($id)
+    {
+        $report = IncidentReport::findOrFail($id);
+        $report->status = 'invalid';
+        $report->save();
+
+        return response()->json([
+            'message' => 'Incident marked as invalid',
+            'data' => $report
+        ]);
+    }
+
 
     public function getActiveIncidents()
     {

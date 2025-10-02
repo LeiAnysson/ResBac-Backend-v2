@@ -15,7 +15,14 @@ class ResponseTeamController extends Controller
 {
     public function index(Request $request)
     {
-        $paginated = ResponseTeam::with(['members.user'])->paginate(10);
+        $query = ResponseTeam::with(['members.user']);
+
+        if ($request->has('search') && $request->search !== "") {
+            $search = $request->search;
+            $query->where('team_name', 'like', "%{$search}%");
+        }
+
+        $paginated = $query->paginate(10);
 
         $paginated->getCollection()->transform(function ($team) {
             return [
@@ -62,7 +69,6 @@ class ResponseTeamController extends Controller
     }
 
 
-    // FRONTEND HANDLES THE DATE CHANGES FOR TEAM ROTATION!!!
     public function show($id)
     {
         $team = ResponseTeam::with('members.user')->findOrFail($id);
