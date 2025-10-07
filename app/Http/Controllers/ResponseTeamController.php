@@ -75,7 +75,8 @@ class ResponseTeamController extends Controller
 
         return response()->json([
             'id' => $team->id,
-            'name' => $team->name,
+            'name' => $team->team_name,
+            'status' => $team->status,
             'members' => $team->members->map(function ($member) {
                 return [
                     'id' => $member->id,

@@ -277,7 +277,7 @@ class IncidentReportController extends Controller
     public function markInvalid($id)
     {
         $report = IncidentReport::findOrFail($id);
-        $report->status = 'invalid';
+        $report->status = 'Invalid';
         $report->save();
 
         return response()->json([

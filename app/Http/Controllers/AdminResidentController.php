@@ -45,26 +45,41 @@ class AdminResidentController extends Controller
 
     public function show($id)
     {
-        $resident = User::with('residentProfile')
-            ->where('role_id', 4)->where('id', $id)->first();
-        
-        if (!$resident){
-            return response()->json(['message' => 'Resident not found'], 404);
+        $user = User::with('residentProfile')->find($id);
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        if ($user->role_id == 4) {
+            return response()->json([
+                'id'        => $user->id,
+                'name'      => trim($user->first_name . ' ' . $user->last_name),
+                'email'     => $user->email,
+                'birthdate' => $user->birthdate,
+                'address'   => $user->address,
+                'status'    => $user->residency_status,
+                'contact'   => $user->contact_num,
+                'resident_profile' => [
+                    'id_image_path' => $user->residentProfile->id_image_path ?? null,
+                    'id_number'     => $user->residentProfile->id_number ?? null,
+                ],
+                'role'      => 'Resident'
+            ]);
         }
 
         return response()->json([
-            'id'        => $resident->id,
-            'name'      => trim($resident->first_name . ' ' . $resident->last_name),
-            'email'     => $resident->email,
-            'birthdate' => $resident->birthdate,
-            'address'   => $resident->address,
-            'status'    => $resident->residency_status,
-            'resident_profile' => [
-                'id_image_path' => $resident->residentProfile->id_image_path ?? null,
-                'id_number'     => $resident->residentProfile->id_number ?? null,
-            ]
+            'id'        => $user->id,
+            'first_name'=> $user->first_name,
+            'last_name' => $user->last_name,
+            'email'     => $user->email,
+            'birthdate' => $user->birthdate,
+            'address'   => $user->address,
+            'contact'   => $user->contact_num,
+            'role_id'   => $user->role_id,
         ]);
     }
+
 
     public function approve($id)
     {
@@ -77,7 +92,7 @@ class AdminResidentController extends Controller
 
             recordActivity('approved residency request', 'User', $user->id);
 
-            // Mail::to($user->email)->send(new ResidencyApprovedMail($user));
+            //Mail::to($user->email)->send(new ResidencyApprovedMail($user));
 
             DB::commit();
 
@@ -106,7 +121,7 @@ class AdminResidentController extends Controller
 
             recordActivity('rejected residency request', 'User', $user->id);
 
-            // Mail::to($user->email)->send(new ResidencyRejectedMail($user));
+            //Mail::to($user->email)->send(new ResidencyRejectedMail($user));
 
             DB::commit();
 

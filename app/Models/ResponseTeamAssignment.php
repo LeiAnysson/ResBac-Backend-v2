@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class ResponseTeamAssignment extends Model
 {
     protected $table = 'response_team_assignments';
-    protected $primaryKey = 'rt_assignment_id';
+    protected $primaryKey = 'id';
 
     protected $fillable = [
         'incident_id',

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Image extends Model
 {
-    protected $fillable = ['file_path', 'description'];
+    protected $fillable = ['file_name', 'file_path', 'uploaded_by'];
 
     public function announcements()
     {

@@ -11,37 +11,40 @@ use App\Models\ResponseTeamMember;
 use App\Models\ResponseTeam;
 use App\Models\BackupRequest;
 use Ably\AblyRest;
+use Illuminate\Support\Facades\Log;
 
 class ResponderReportController extends Controller
 {
     public function index(Request $request)
     {
         $user = Auth::user();
-        $teamId = ResponseTeamMember::where('User_id', $user->User_id)->value('Team_id');
+        $teamId = ResponseTeamMember::where('user_id', $user->id)->value('team_id');
+        Log::info('Responder team_id: ' . $teamId);
 
         $reports = ResponseTeamAssignment::where('team_id', $teamId)
-            ->whereIn('status', ['accepted', 'enroute', 'resolved'])
-            ->with('incidentReport.incidentType')
+            ->whereIn('status', ['assigned', 'accepted', 'enroute', 'resolved'])
+            ->with('incident.incidentType')
             ->orderBy('assigned_at', 'desc')
             ->get()
             ->map(function ($assignment) {
-                $report = $assignment->incidentReport;
+                $report = $assignment->incident;
                 return [
-                    'id' => $report->Incident_id,
-                    'type' => $report->incidentType->Name ?? 'Unknown',
-                    'status' => $assignment->Status,
-                    'landmark' => $report->Landmark,
-                    'date' => \Carbon\Carbon::parse($report->Reported_at)->format('M d, Y h:i A'),
+                    'id' => $report->id,
+                    'type' => $report->incidentType->name ?? 'Unknown',
+                    'status' => $assignment->status,
+                    'landmark' => $report->landmark,
+                    'date' => \Carbon\Carbon::parse($report->reported_at)->format('M d, Y h:i A'),
                 ];
             });
 
         return response()->json($reports);
+
     }
 
     public function show($id)
     {
         $user = Auth::user();
-        $teamId = ResponseTeamMember::where('User_id', $user->User_id)->value('Team_id');
+        $teamId = ResponseTeamMember::where('user_id', $user->id)->value('team_id');
 
         $assignment = ResponseTeamAssignment::where('team_id', $teamId)
             ->where('incident_id', $id)
@@ -54,19 +57,21 @@ class ResponderReportController extends Controller
             ], 404);
         }
 
-        $report = $assignment->incidentReport()->with('incidentType', 'reporter')->first();
+        $report = $assignment->incident()->with('incidentType', 'reporter')->first();
 
         return response()->json([
             'success' => true,
             'report' => [
-                'id' => $report->Incident_id,
-                'type' => $report->incidentType->Name ?? 'Unknown',
-                'reporterName' => $report->reporter->First_name . ' ' . $report->reporter->Last_name,
-                'landmark' => $report->Landmark,
-                'address' => $report->Location,
-                'status' => $assignment->Status,
-                'dateTime' => \Carbon\Carbon::parse($report->Reported_at)->format('M d, Y h:i A'),
-                'description' => $report->Description,
+                'id' => $report->id,
+                'type' => $report->incidentType->name ?? 'Unknown',
+                'reporterName' => $report->reporter->first_name . ' ' . $report->reporter->last_name,
+                'landmark' => $report->landmark,
+                'latitude' => $report->latitude,
+                'longitude' => $report->longitude,
+                'address' => $report->location ?? null,
+                'status' => $assignment->status,
+                'dateTime' => \Carbon\Carbon::parse($report->reported_at)->format('M d, Y h:i A'),
+                'description' => $report->description,
             ]
         ]);
     }

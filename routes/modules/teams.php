@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ResponseTeamController;
 
 Route::middleware(['auth:sanctum', 'role:Admin'])->prefix('admin/teams')->group(function () {
+    Route::post('/create-team', [ResponseTeamController::class, 'store']);
     Route::get('/{id}', [ResponseTeamController::class, 'show']); 
     Route::put('/{id}', [ResponseTeamController::class, 'update']); 
     Route::post('/{id}/add-member', [ResponseTeamController::class, 'addMember']);

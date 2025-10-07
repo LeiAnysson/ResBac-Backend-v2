@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Image;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AnnouncementController extends Controller
 {
@@ -64,32 +65,65 @@ class AnnouncementController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'content' => 'required|string',
-            'images.*' => 'image|mimes:jpg,jpeg,png,gif|max:10240', 
+            'images.*' => 'image|mimes:jpg,jpeg,png,gif|max:10240',
         ]);
 
-        $announcement = Announcement::create([
-            'title' => $validated['title'],
-            'content' => $validated['content'],
-            'posted_at' => now(),
-            'uploaded_by' => Auth::id(), 
-        ]);
+        DB::beginTransaction();
 
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $file) {
-                $path = $file->store('announcement', 'public'); 
+        try {
+            $announcement = Announcement::create([
+                'title' => $validated['title'],
+                'content' => $validated['content'],
+                'posted_at' => now(),
+                'posted_by' => Auth::id(),
+            ]);
 
-                $image = Image::create([
-                    'file_path' => "/storage/$path",
-                    'description' => null,
-                ]);
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $file) {
+                    $path = $file->store('announcement', 'public');
 
-                $announcement->images()->attach($image->id);
+                    $image = Image::create([
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_path' => "/storage/$path",
+                        'uploaded_by' => Auth::id(),
+                    ]);
+
+                    $announcement->images()->attach($image->id);
+                }
             }
-        }
 
-        return response()->json([
-            'message' => 'Announcement created successfully',
-            'announcement' => $announcement->load('images', 'poster')
-        ], 201);
+            $announcement->load('images', 'poster');
+
+            recordActivity('created a post', 'Announcement', $announcement->posted_by);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Announcement created successfully.',
+                'announcement' => $announcement
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error($e);
+
+            return response()->json([
+                'error' => 'Failed to create announcement.',
+                'details' => $e->getMessage(),
+            ], 500);
+        }
     }
+
+    public function destroy($id)
+    {
+        $announcement = Announcement::findOrFail($id);
+        $announcement->images()->detach();
+
+        recordActivity('deleted a post', 'Announcement', $announcement->posted_by);
+        
+        $announcement->delete();
+
+        return response()->json(['message' => 'Announcement deleted successfully.']);
+    }
+
 }

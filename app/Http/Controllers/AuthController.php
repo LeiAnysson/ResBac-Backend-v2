@@ -37,8 +37,14 @@ class AuthController extends Controller
 
         $idImagePath = null;
         if ($request->hasFile('id_image')) {
-            $idImagePath = $request->file('id_image')->store('id_images', 'public');
+            $file = $request->file('id_image');
+            $idImagePath = $file->storeAs(
+                'id_images',
+                $file->hashName(),
+                'public'
+            );
         }
+
 
         $user = User::create([
             'first_name' => $request->first_name,
