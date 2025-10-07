@@ -11,6 +11,7 @@ class IncidentHelper
         $incidents = IncidentReport::where('incident_type_id', $incidentTypeId)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
+            ->where('created_at', '>=', now()->subHours(3))
             ->get();
 
         foreach ($incidents as $incident) {

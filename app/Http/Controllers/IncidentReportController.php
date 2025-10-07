@@ -267,11 +267,14 @@ class IncidentReportController extends Controller
         $incident = IncidentReport::findOrFail($incidentId);
         $user = Auth::user();
 
-        $endedBy = $user->role_id === 2 ? 'dispatcher' : 'resident';
+        $endedByRole = $user->role_id === 2 ? 'dispatcher' : 'resident';
+        $endedById   = $user->id;
 
-        broadcast(new CallEnded($incidentId, $endedBy));
+        $reporterId = $incident->reported_by ?? $incident->user->id ?? null;
 
-        return response()->json(['message' => ucfirst($endedBy).' ended the call']);
+        broadcast(new CallEnded($incidentId, $endedByRole, $endedById, $reporterId));
+
+        return response()->json(['message' => ucfirst($endedByRole).' ended the call']);
     }
 
     public function markInvalid($id)

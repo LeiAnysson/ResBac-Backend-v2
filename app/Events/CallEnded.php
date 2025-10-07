@@ -11,13 +11,21 @@ class CallEnded implements ShouldBroadcast
 {
     use Dispatchable, SerializesModels;
 
-    public $endedBy;
-    public $incidentId;
+    public $payload;
 
-    public function __construct($incidentId, $endedBy)
+    public function __construct($incidentId, $endedByRole, $endedById = null, $reporterId = null)
     {
-        $this->incidentId = $incidentId;
-        $this->endedBy = $endedBy;
+        $this->payload = [
+            'incidentId'   => $incidentId,
+            'endedByRole'  => $endedByRole,
+            'endedById'    => $endedById,
+            'reporterId'   => $reporterId, 
+        ];
+    }
+
+    public function broadcastWith()
+    {
+        return $this->payload;
     }
 
     public function broadcastOn()
