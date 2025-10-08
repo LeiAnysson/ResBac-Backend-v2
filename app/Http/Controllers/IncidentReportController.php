@@ -289,6 +289,13 @@ class IncidentReportController extends Controller
         ]);
     }
 
+    public function destroy($id)
+    {
+        $incident = IncidentReport::findOrFail($id);
+        $incident->delete();
+
+        return response()->json(['message' => 'Incident deleted successfully']);
+    }
 
     public function getActiveIncidents()
     {
