@@ -24,6 +24,8 @@ class ResidentReportController extends Controller
                     'status' => $report->status,
                     'landmark' => $report->landmark,
                     'date' => \Carbon\Carbon::parse($report->reported_at)->format('M d, Y h:i A'),
+                    'latitude' => $report->latitude,
+                    'longitude' => $report->longitude, 
                 ];
             });
 

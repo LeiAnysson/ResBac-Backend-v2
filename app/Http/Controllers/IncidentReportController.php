@@ -164,7 +164,8 @@ class IncidentReportController extends Controller
 
                 $dupPayload = [
                     'incident_id'     => $duplicateIncident->id,
-                    'incident_type'   => $duplicateIncident->incidentType,
+                    'incident_type'   => $duplicateIncident->incidentType->name ?? null,
+                    'incident_type_id'=> $duplicateIncident->incident_type_id,
                     'duplicate_count' => $duplicateIncident->duplicates 
                         ? count(json_decode($duplicateIncident->duplicates, true))
                         : 1,
@@ -175,6 +176,8 @@ class IncidentReportController extends Controller
                 } catch (\Exception $e) {
                     Log::error('DuplicateReportCreated broadcast failed: ' . $e->getMessage());
                 }
+
+                DB::commit();
 
                 return response()->json([
                     'message' => 'Duplicate report detected. Dispatcher notified.',

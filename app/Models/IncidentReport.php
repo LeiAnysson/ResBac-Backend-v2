@@ -24,9 +24,14 @@ class IncidentReport extends Model
         'status',
         'reported_at',
         'priority_id',
+        'duplicates',
     ];
 
     protected $dates = ['reported_at'];
+
+    protected $casts = [
+        'duplicates' => 'array',
+    ];
 
     public function reporter()
     {

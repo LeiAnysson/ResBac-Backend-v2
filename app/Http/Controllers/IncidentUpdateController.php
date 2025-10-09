@@ -7,6 +7,7 @@ use App\Models\IncidentUpdate;
 use App\Models\IncidentReport;
 use Illuminate\Support\Facades\Auth;
 use Ably\AblyRest;
+use App\Events\IncidentUpdated;
 
 class IncidentUpdateController extends Controller
 {
@@ -39,18 +40,49 @@ class IncidentUpdateController extends Controller
             'update_details' => $validated['update_details'],
         ]);
 
-        $ably = new AblyRest(env('ABLY_API_KEY'));
-        $channel = $ably->channel('responder-updates');
-        $channel->publish('update', [
-            'incident_id' => $incident->id,
-            'description' => $incident->description,
-            'landmark'    => $incident->landmark,
-            'updated_at'  => now()->toDateTimeString(),
-        ]);
+        if ($incident->latitude && $incident->longitude && $incident->status !== 'On Scene') {
+            $assignedTeam = \App\Models\ResponseTeam::whereHas('assignments', function ($query) use ($incident) {
+                $query->where('incident_id', $incident->id);
+            })->first();
+
+            if ($assignedTeam && $assignedTeam->latitude && $assignedTeam->longitude) {
+                $distance = $this->calculateDistance(
+                    $incident->latitude,
+                    $incident->longitude,
+                    $assignedTeam->latitude,
+                    $assignedTeam->longitude
+                );
+
+                if ($distance <= 50) {
+                    $incident->status = 'On Scene';
+                    $incident->save();
+                }
+            }
+        }
+
+        broadcast(new IncidentUpdated($incident))->toOthers();
 
         return response()->json([
             'message' => 'Incident updated successfully',
             'data'    => $update,
         ], 201);
+    }
+
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371000;
+
+        $latFrom = deg2rad($lat1);
+        $lonFrom = deg2rad($lon1);
+        $latTo = deg2rad($lat2);
+        $lonTo = deg2rad($lon2);
+
+        $latDelta = $latTo - $latFrom;
+        $lonDelta = $lonTo - $lonFrom;
+
+        $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+            cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+
+        return $earthRadius * $angle;
     }
 }

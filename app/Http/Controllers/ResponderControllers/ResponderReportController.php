@@ -12,6 +12,7 @@ use App\Models\ResponseTeam;
 use App\Models\BackupRequest;
 use Ably\AblyRest;
 use Illuminate\Support\Facades\Log;
+use App\Events\IncidentUpdated;
 
 class ResponderReportController extends Controller
 {
@@ -100,15 +101,40 @@ class ResponderReportController extends Controller
     public function updateLocation(Request $request)
     {
         $request->validate([
-            'team_id' => 'required|exists:ResponseTeam,Team_id',
+            'team_id' => 'required|exists:response_teams,id',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
         ]);
 
-        $team = ResponseTeam::find($request->team_id);
+        $team = ResponseTeam::findOrFail($request->team_id);
         $team->latitude = $request->latitude;
         $team->longitude = $request->longitude;
         $team->save();
+
+        $assignment = ResponseTeamAssignment::where('team_id', $team->id)
+            ->whereHas('incident', function ($query) {
+                $query->whereIn('status', ['Assigned', 'En Route']);
+            })
+            ->latest()
+            ->first();
+
+        if ($assignment && $assignment->incident) {
+            $incident = $assignment->incident;
+
+            $distance = $this->calculateDistance(
+                $incident->latitude,
+                $incident->longitude,
+                $team->latitude,
+                $team->longitude
+            );
+
+            if ($distance <= 50 && $incident->status !== 'On Scene') {
+                $incident->status = 'On Scene';
+                $incident->save();
+
+                broadcast(new IncidentUpdated($incident))->toOthers();
+            }
+        }
 
         $ably = new AblyRest(env('ABLY_API_KEY'));
         $ably->channel('responder-location')->publish('update', [
@@ -120,10 +146,26 @@ class ResponderReportController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Team location updated'
+            'message' => 'Team location updated successfully'
         ]);
     }
 
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371000; // meters
+        $latFrom = deg2rad($lat1);
+        $lonFrom = deg2rad($lon1);
+        $latTo = deg2rad($lat2);
+        $lonTo = deg2rad($lon2);
+
+        $latDelta = $latTo - $latFrom;
+        $lonDelta = $lonTo - $lonFrom;
+
+        $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+            cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+
+        return $earthRadius * $angle;
+    }
 
     public function updateStatus(Request $request, $incidentId)
     {   
@@ -132,7 +174,7 @@ class ResponderReportController extends Controller
         ]);
 
         $user = Auth::user();
-        $teamId = ResponseTeamMember::where('User_id', $user->User_id)->value('Team_id');
+        $teamId = ResponseTeamMember::where('user_id', $user->user_id)->value('team_id');
 
         $assignment = ResponseTeamAssignment::where('team_id', $teamId)
             ->where('incident_id', $incidentId)
@@ -145,13 +187,13 @@ class ResponderReportController extends Controller
             ], 404);
         }
 
-        $assignment->Status = $request->status;
+        $assignment->status = $request->status;
         $assignment->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Status updated successfully',
-            'status' => $assignment->Status
+            'status' => $assignment->status
         ]);
     }
 
@@ -163,15 +205,21 @@ class ResponderReportController extends Controller
         ]);
 
         $user = Auth::user();
-        $teamId = ResponseTeamMember::where('User_id', $user->User_id)->value('Team_id');
 
         $backup = BackupRequest::create([
-            'responder_id' => $user->User_id,
+            'responder_id' => $user->user_id,
             'incident_id' => $incidentId,
             'backup_type' => $request->backup_type,
+            'reason' => $request->reason,
             'status' => 'pending',
             'requested_at' => now(),
         ]);
+
+        $incident = IncidentReport::find($incidentId);
+        if ($incident) {
+            $incident->status = 'Requesting Backup';
+            $incident->save();
+        }
 
         return response()->json([
             'success' => true,
@@ -179,5 +227,4 @@ class ResponderReportController extends Controller
             'backup' => $backup
         ]);
     }
-
 }
