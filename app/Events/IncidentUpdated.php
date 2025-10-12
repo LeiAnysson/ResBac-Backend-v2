@@ -24,6 +24,7 @@ class IncidentUpdated implements ShouldBroadcastNow
         return [
             new Channel('responder'),
             new Channel('resident'),
+            new Channel('dispatcher'),
         ];
     }
 

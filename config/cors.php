@@ -6,7 +6,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:3000', 'https://resbac.kiri8tives.com'], 
+    'allowed_origins' => ['http://localhost:3000', 'https://resbac.kiri8tives.com', 'exp://192.168.100.206:8081'], 
 
     'allowed_origins_patterns' => [],
 

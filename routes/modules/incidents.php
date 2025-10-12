@@ -6,10 +6,13 @@ use App\Http\Controllers\IncidentCallerController;
 use App\Http\Controllers\IncidentUpdateController;
 use App\Http\Controllers\ResponseTeamAssignmentController;
 
+Route::middleware(['auth:sanctum', 'role:Admin'])->group(function () {
+    Route::delete('/incidents/{id}', [IncidentReportController::class, 'destroy']);
+});
+
 Route::middleware(['auth:sanctum', 'role:Admin,MDRRMO'])->group(function () {
     Route::get('/incidents', [IncidentReportController::class, 'index']);
     Route::get('/incidents/{id}', [IncidentReportController::class, 'show']);
-    Route::delete('/incidents/{id}', [IncidentReportController::class, 'destroy']);
     Route::get('/incidents/weekly-reports', [IncidentReportController::class, 'reportsResolvedThisWeek']);
 });
 
@@ -24,6 +27,8 @@ Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {
     Route::post('incidents/{id}/assign-team', [ResponseTeamAssignmentController::class, 'store']);
     Route::put('incidents/team-assignments/{id}', [ResponseTeamAssignmentController::class, 'update']);
     Route::get('incidents/active', [IncidentReportController::class, 'getActiveIncidents']);
+    
+    Route::post('incidents/backups/{id}/acknowledge', [IncidentReportController::class, 'acknowledgeBackup']);
 });
 
 Route::middleware(['auth:sanctum', 'role:Resident'])->group(function () {

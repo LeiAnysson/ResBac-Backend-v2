@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\DB;
 use App\Models\ResponseTeamMember;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Carbon\Carbon;
 
 class ResponseTeamController extends Controller
 {
@@ -36,38 +35,80 @@ class ResponseTeamController extends Controller
 
         return response()->json($paginated);
     }
-    
+
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|unique:response_teams,name',
-            'member_ids' => 'array', // optional
-            'member_ids.*' => 'exists:users,id'
+            'team_name' => 'required|string|unique:response_teams,team_name',
+            'member_ids' => 'nullable|array',
+            'member_ids.*' => 'exists:users,id',
+            'status' => 'nullable|in:available,unavailable'
         ]);
 
         DB::transaction(function () use ($request, &$team) {
             $team = ResponseTeam::create([
-                'name' => $request->name,
+                'team_name' => $request->team_name,
+                'status' => $request->status ?? 'unavailable',
             ]);
 
-            if ($request->has('member_ids')) {
+            if (!empty($request->member_ids)) {
                 foreach ($request->member_ids as $userId) {
-                    ResponseTeamMember::create([
-                        'response_team_id' => $team->id,
-                        'user_id' => $userId,
-                    ]);
+                    ResponseTeamMember::updateOrCreate(
+                        ['team_id' => $team->id, 'user_id' => $userId],
+                        ['deleted_at' => null] 
+                    );
                 }
             }
 
-            recordActivity('created team', 'ResponseTeam', $team->id);
+            recordActivity('Created team', 'Response Team', $team->id);
         });
 
         return response()->json([
-            'message' => 'Response team created successfully.',
+            'message' => 'Team created successfully',
             'team' => $team->load('members.user')
         ]);
     }
 
+    public function update(Request $request, $id)
+    {
+        $team = ResponseTeam::with('members')->findOrFail($id);
+
+        $validated = $request->validate([
+            'team_name' => 'sometimes|required|string|unique:response_teams,team_name,' . $team->id,
+            'member_ids' => 'sometimes|array',
+            'member_ids.*' => 'exists:users,id',
+            'status' => 'sometimes|in:available,unavailable'
+        ]);
+
+        DB::transaction(function () use ($team, $validated, $request) {
+            $team->update([
+                'team_name' => $validated['team_name'] ?? $team->team_name,
+                'status' => $validated['status'] ?? $team->status,
+            ]);
+
+            $currentMemberIds = $team->members()->pluck('user_id')->toArray();
+            $newMemberIds = $validated['member_ids'] ?? [];
+
+            $toRemoveIds = $request->input('removed_member_ids', []);
+            if (!empty($toRemoveIds)) {
+                ResponseTeamMember::whereIn('id', $toRemoveIds)->delete();
+            }
+
+            $toAdd = array_diff($newMemberIds, $currentMemberIds);
+            foreach ($toAdd as $userId) {
+                ResponseTeamMember::updateOrCreate(
+                    ['team_id' => $team->id, 'user_id' => $userId],
+                );
+            }
+
+            recordActivity('Updated team', 'Response Team', $team->id);
+        });
+
+        return response()->json([
+            'message' => 'Team updated successfully',
+            'team' => $team->fresh()->load('members.user')
+        ]);
+    }
 
     public function show($id)
     {
@@ -95,17 +136,13 @@ class ResponseTeamController extends Controller
         return DB::transaction(function () use ($request, $teamId) {
             $team = ResponseTeam::findOrFail($teamId);
 
-            if ($team->members()->where('user_id', $request->user_id)->exists()) {
-                return response()->json(['message' => 'User already in this team'], 400);
-            }
-
-            $member = ResponseTeamMember::create([
-                'team_id' => $teamId,
-                'user_id' => $request->user_id,
-            ]);
+            $member = ResponseTeamMember::updateOrCreate(
+                ['team_id' => $teamId, 'user_id' => $request->user_id],
+                ['deleted_at' => null]
+            );
 
             $userId = Auth::id();
-            recordActivity("Added user {$request->user_id} to team {$team->team_name}", 'ResponseTeam',$userId);
+            recordActivity("Added user {$request->user_id} to team {$team->team_name}", 'ResponseTeam', $userId);
 
             return response()->json([
                 'message' => 'Member added successfully',
@@ -118,9 +155,8 @@ class ResponseTeamController extends Controller
     {
         return DB::transaction(function () use ($teamId, $memberId) {
             $member = ResponseTeamMember::where('team_id', $teamId)->where('id', $memberId)->firstOrFail();
-
             $member->delete();
-            
+
             $userId = Auth::id();
             recordActivity("Removed member {$memberId} from team {$teamId}", 'ResponseTeam', $userId);
 
@@ -137,11 +173,19 @@ class ResponseTeamController extends Controller
             'rotation_start_team' => 'nullable|string|in:Alpha,Bravo,Charlie',
         ]);
 
-        Cache::put('rotation_start_date', $data['rotation_start_date']);
+        Cache::forever('rotation_start_date', $data['rotation_start_date']);
         if (!empty($data['rotation_start_team'])) {
-            Cache::put('rotation_start_team', $data['rotation_start_team']);
+            Cache::forever('rotation_start_team', $data['rotation_start_team']);
         }
 
         return response()->json(['message' => 'Rotation start date updated.']);
+    }
+
+    public function destroy($id)
+    {
+        $team = ResponseTeam::findOrFail($id);
+        $team->delete();
+
+        return response()->json(['message' => 'Response team deleted successfully']);
     }
 }

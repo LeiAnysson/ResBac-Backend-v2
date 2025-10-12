@@ -13,6 +13,8 @@ use App\Models\BackupRequest;
 use Ably\AblyRest;
 use Illuminate\Support\Facades\Log;
 use App\Events\IncidentUpdated;
+use App\Events\BackupRequestCreated;
+use App\Events\BackupAutomaticallyAssigned;
 
 class ResponderReportController extends Controller
 {
@@ -27,6 +29,9 @@ class ResponderReportController extends Controller
             ->with('incident.incidentType')
             ->orderBy('assigned_at', 'desc')
             ->get()
+            ->filter(function ($assignment) {
+                return $assignment->incident !== null;
+            })
             ->map(function ($assignment) {
                 $report = $assignment->incident;
                 return [
@@ -174,7 +179,7 @@ class ResponderReportController extends Controller
         ]);
 
         $user = Auth::user();
-        $teamId = ResponseTeamMember::where('user_id', $user->user_id)->value('team_id');
+        $teamId = ResponseTeamMember::where('user_id', $user->id)->value('team_id');
 
         $assignment = ResponseTeamAssignment::where('team_id', $teamId)
             ->where('incident_id', $incidentId)
@@ -190,6 +195,9 @@ class ResponderReportController extends Controller
         $assignment->status = $request->status;
         $assignment->save();
 
+        $incident = $assignment->incident;
+        broadcast(new IncidentUpdated($incident))->toOthers();
+
         return response()->json([
             'success' => true,
             'message' => 'Status updated successfully',
@@ -200,14 +208,16 @@ class ResponderReportController extends Controller
     public function requestBackup(Request $request, $incidentId)
     {
         $request->validate([
-            'backup_type' => 'required|string',
+            'backup_type' => 'required|string|in:medic,lgu',
             'reason' => 'required|string',
         ]);
 
         $user = Auth::user();
 
+        $teamId = ResponseTeamMember::where('user_id', $user->id)->value('team_id');
+
         $backup = BackupRequest::create([
-            'responder_id' => $user->user_id,
+            'response_team_id' => $teamId, 
             'incident_id' => $incidentId,
             'backup_type' => $request->backup_type,
             'reason' => $request->reason,
@@ -221,10 +231,38 @@ class ResponderReportController extends Controller
             $incident->save();
         }
 
+        if ($request->backup_type === 'Medical Service') {
+            $medicTeam = ResponseTeam::where('name', 'Medical')->first();
+
+            if ($medicTeam) {
+                ResponseTeamAssignment::create([
+                    'incident_id' => $incidentId,
+                    'team_id' => $medicTeam->id,
+                    'status' => 'Assigned',
+                ]);
+
+                $incident->status = 'Backup (Medical Team) Assigned';
+                $incident->save();
+
+                broadcast(new BackupAutomaticallyAssigned($incident, $backup, $medicTeam))->toOthers();
+
+                $backup->status = 'assigned';
+                $backup->save();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Medical backup automatically assigned.',
+                    'backup' => $backup,
+                ]);
+            }
+        }
+
+        broadcast(new BackupRequestCreated($incidentId,$teamId,$request->backup_type))->toOthers();
+
         return response()->json([
             'success' => true,
-            'message' => 'Backup request sent successfully',
-            'backup' => $backup
+            'message' => 'Backup request sent to dispatcher.',
+            'backup' => $backup,
         ]);
     }
 }

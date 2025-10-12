@@ -23,6 +23,8 @@ use Peterujah\Agora\Builders\RtcToken;
 use App\Helpers\IncidentHelper;
 use App\Events\DuplicateReportCreated;
 use App\Events\IncidentAssigned;
+use App\Events\BackupAcknowledged;
+use App\Models\BackupRequest;
 
 class IncidentReportController extends Controller
 {
@@ -176,9 +178,9 @@ class IncidentReportController extends Controller
                 } catch (\Exception $e) {
                     Log::error('DuplicateReportCreated broadcast failed: ' . $e->getMessage());
                 }
-
+                
                 DB::commit();
-
+                
                 return response()->json([
                     'message' => 'Duplicate report detected. Dispatcher notified.',
                     'duplicate_of' => $duplicateIncident->id,
@@ -199,6 +201,7 @@ class IncidentReportController extends Controller
                 'reported_by'      => $userId,
                 'caller_name'      => $user->first_name . ' ' . $user->last_name,
                 'priority_id'      => $priorityId,
+                'reported_at'      => now(),
             ]);
 
             try {
@@ -269,16 +272,39 @@ class IncidentReportController extends Controller
     {
         $incident = IncidentReport::findOrFail($incidentId);
         $user = Auth::user();
-
+    
         $endedByRole = $user->role_id === 2 ? 'dispatcher' : 'resident';
         $endedById   = $user->id;
-
+    
         $reporterId = $incident->reported_by ?? $incident->user->id ?? null;
-
+    
         broadcast(new CallEnded($incidentId, $endedByRole, $endedById, $reporterId));
-
+    
         return response()->json(['message' => ucfirst($endedByRole).' ended the call']);
     }
+
+    public function acknowledgeBackup(Request $request, $backupId)
+    {
+        $backup = BackupRequest::find($backupId);
+
+        if (!$backup) {
+            return response()->json(['success' => false, 'message' => 'Backup not found'], 404);
+        }
+
+        $incident = IncidentReport::find($backup->incident_id);
+
+        $backup->status = 'acknowledged';
+        $backup->save();
+
+        broadcast(new BackupAcknowledged($incident, $backup))->toOthers();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Backup request acknowledged successfully.',
+            'backup' => $backup
+        ]);
+    }
+
 
     public function markInvalid($id)
     {
@@ -291,7 +317,7 @@ class IncidentReportController extends Controller
             'data' => $report
         ]);
     }
-
+    
     public function destroy($id)
     {
         $incident = IncidentReport::findOrFail($id);

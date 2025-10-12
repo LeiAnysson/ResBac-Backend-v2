@@ -10,7 +10,7 @@ class BackupRequest extends Model
     use SoftDeletes;
 
     protected $table = 'backup_requests';
-    protected $fillable = ['responder_id', 'incident_id', 'status', 'backup_type', 'requested_at'];
+    protected $fillable = ['response_team_id', 'incident_id', 'status', 'backup_type', 'requested_at', 'reason'];
 
     public function responder()
     {

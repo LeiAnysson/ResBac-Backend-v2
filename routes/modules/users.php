@@ -9,7 +9,8 @@ Route::middleware(['auth:sanctum', 'role:Admin'])->group(function () {
     Route::get('/admin/users/{id}', [AdminResidentController::class, 'show']);
     Route::post('/admin/users/{id}/assign-role', [UserController::class, 'assignRole']);
     Route::post('/admin/users/create', [UserController::class, 'createAccount']);
-    Route::put('/admin/users/{id}/edit', [UserController::class, 'editUser']);
+    Route::put('/admin/users/{id}/edit', [UserController::class, 'updateUser']);
     Route::get('/admin/users/total-users', [UserController::class, 'totalUsers']);
+    Route::delete('/admin/users/{id}', [UserController::class, 'destroy']);
 });
 

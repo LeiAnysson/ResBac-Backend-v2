@@ -46,40 +46,35 @@ class AdminResidentController extends Controller
     public function show($id)
     {
         $user = User::with('residentProfile')->find($id);
-
+    
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
         }
-
-        if ($user->role_id == 4) {
-            return response()->json([
-                'id'        => $user->id,
-                'name'      => trim($user->first_name . ' ' . $user->last_name),
-                'email'     => $user->email,
-                'birthdate' => $user->birthdate,
-                'address'   => $user->address,
-                'status'    => $user->residency_status,
-                'contact'   => $user->contact_num,
-                'resident_profile' => [
-                    'id_image_path' => $user->residentProfile->id_image_path ?? null,
-                    'id_number'     => $user->residentProfile->id_number ?? null,
-                ],
-                'role'      => 'Resident'
-            ]);
+    
+        $response = [
+            'id'          => $user->id,
+            'first_name'  => $user->first_name,
+            'last_name'   => $user->last_name,
+            'email'       => $user->email,
+            'birthdate'   => $user->birthdate,
+            'address'     => $user->address,
+            'contact_num' => $user->contact_num,
+            'role'        => $user->role->name ?? null,
+            'role_id'     => $user->role_id,
+        ];
+    
+        if ($user->role_id == 4) { 
+            $response['status'] = $user->residency_status;
+            $response['resident_profile'] = [
+                'id_image_path' => $user->residentProfile->id_image_path ?? null,
+                'id_number'     => $user->residentProfile->id_number ?? null,
+            ];
+        } else {
+            $response['team_id'] = $user->team_id ?? null;
         }
-
-        return response()->json([
-            'id'        => $user->id,
-            'first_name'=> $user->first_name,
-            'last_name' => $user->last_name,
-            'email'     => $user->email,
-            'birthdate' => $user->birthdate,
-            'address'   => $user->address,
-            'contact'   => $user->contact_num,
-            'role_id'   => $user->role_id,
-        ]);
+    
+        return response()->json($response);
     }
-
 
     public function approve($id)
     {

@@ -14,27 +14,35 @@ use App\Models\ResponseTeam;
 */
 
 Artisan::command('rotate:teams', function () {
-    $startDateStr = Cache::get('rotation_start_date', Carbon::today()->toDateString());
+    $teamsOrder = ['Alpha', 'Bravo', 'Charlie'];
+
+    $startDateStr = Cache::get('rotation_start_date');
     $startTeam = Cache::get('rotation_start_team', 'Alpha');
 
-    $startDate = Carbon::parse($startDateStr)->startOfDay();
-    $teamsOrder = ['Alpha','Bravo','Charlie'];
+    if (!$startDateStr) {
+        $startDateStr = Carbon::today()->toDateString();
+        Cache::forever('rotation_start_date', $startDateStr);
+        Cache::forever('rotation_start_team', $startTeam);
+    }
 
+    $startDate = Carbon::parse($startDateStr)->startOfDay();
     $startIndex = array_search($startTeam, $teamsOrder);
     if ($startIndex === false) $startIndex = 0;
 
-    $daysPassed = $startDate->diffInDays(Carbon::today()) + 1;
+    $daysPassed = (int) $startDate->diffInDays(Carbon::today());
+    Log::info("DEBUG rotation_start_date={$startDateStr}, startTeam={$startTeam}, daysPassed={$daysPassed}");
+    
     $currentIndex = ($startIndex + $daysPassed) % count($teamsOrder);
     $currentTeamName = $teamsOrder[$currentIndex];
 
     ResponseTeam::whereIn('team_name', $teamsOrder)->update(['status' => 'unavailable']);
+    ResponseTeam::where('team_name', $currentTeamName)->update(['status' => 'available']);
 
-    $currentTeam = ResponseTeam::where('team_name', $currentTeamName)->first();
-    if ($currentTeam) {
-        $currentTeam->update(['status' => 'available']);
+    if ($daysPassed >= 1) {
+        Cache::forever('rotation_start_date', Carbon::today()->toDateString());
+        Cache::forever('rotation_start_team', $currentTeamName);
     }
 
     Log::info("Team rotation applied. Available team: {$currentTeamName}");
     $this->info("Team rotation applied. Available team: {$currentTeamName}");
 });
-
