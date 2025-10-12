@@ -25,7 +25,7 @@ class ResponderReportController extends Controller
         Log::info('Responder team_id: ' . $teamId);
 
         $reports = ResponseTeamAssignment::where('team_id', $teamId)
-            ->whereIn('status', ['assigned', 'accepted', 'enroute', 'resolved'])
+            ->whereIn('status', ['assigned', 'En Route', 'On Scene', 'Requesting Backup', 'Resolved'])
             ->with('incident.incidentType')
             ->orderBy('assigned_at', 'desc')
             ->get()
@@ -118,7 +118,7 @@ class ResponderReportController extends Controller
 
         $assignment = ResponseTeamAssignment::where('team_id', $team->id)
             ->whereHas('incident', function ($query) {
-                $query->whereIn('status', ['Assigned', 'En Route']);
+                $query->whereIn('status', ['assigned', 'En Route']);
             })
             ->latest()
             ->first();
@@ -196,6 +196,10 @@ class ResponderReportController extends Controller
         $assignment->save();
 
         $incident = $assignment->incident;
+
+        $incident->status = $assignment->status;
+        $incident->save();
+        
         broadcast(new IncidentUpdated($incident))->toOthers();
 
         return response()->json([
@@ -231,14 +235,26 @@ class ResponderReportController extends Controller
             $incident->save();
         }
 
-        if ($request->backup_type === 'Medical Service') {
-            $medicTeam = ResponseTeam::where('name', 'Medical')->first();
+        $assignment = ResponseTeamAssignment::where('incident_id', $incidentId)
+            ->where('team_id', $teamId)
+            ->first();
+
+        if ($assignment) {
+            $assignment->status = 'Requesting Backup';
+            $assignment->save();
+        }
+
+        if ($request->backup_type === 'medic') {
+            Log::info('Medic backup type detected.');
+            $medicTeam = ResponseTeam::where('team_name', 'Medical')->first();
 
             if ($medicTeam) {
+                Log::info('Found medic team: ' . $medicTeam->id);
                 ResponseTeamAssignment::create([
                     'incident_id' => $incidentId,
                     'team_id' => $medicTeam->id,
-                    'status' => 'Assigned',
+                    'dispatcher_id' => Auth::id(),
+                    'status' => 'assigned',
                 ]);
 
                 $incident->status = 'Backup (Medical Team) Assigned';
@@ -254,6 +270,8 @@ class ResponderReportController extends Controller
                     'message' => 'Medical backup automatically assigned.',
                     'backup' => $backup,
                 ]);
+            } else {
+                Log::warning('No Medical team found.');
             }
         }
 
