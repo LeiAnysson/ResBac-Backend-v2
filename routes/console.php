@@ -14,35 +14,32 @@ use App\Models\ResponseTeam;
 */
 
 Artisan::command('rotate:teams', function () {
-    $teamsOrder = ['Alpha', 'Bravo', 'Charlie'];
+    $teams = ResponseTeam::where('team_name', '!=', 'Medical')
+        ->whereNull('deleted_at')
+        ->orderBy('rotation_index')
+        ->get();
 
-    $startDateStr = Cache::get('rotation_start_date');
-    $startTeam = Cache::get('rotation_start_team', 'Alpha');
-
-    if (!$startDateStr) {
-        $startDateStr = Carbon::today()->toDateString();
-        Cache::forever('rotation_start_date', $startDateStr);
-        Cache::forever('rotation_start_team', $startTeam);
+    if ($teams->isEmpty()) {
+        $this->error("No active teams found for rotation.");
+        return;
     }
 
-    $startDate = Carbon::parse($startDateStr)->startOfDay();
-    $startIndex = array_search($startTeam, $teamsOrder);
-    if ($startIndex === false) $startIndex = 0;
+    $currentTeam = $teams->firstWhere('status', 'available');
+    $currentIndex = $currentTeam ? $currentTeam->rotation_index : 0;
 
-    $daysPassed = (int) $startDate->diffInDays(Carbon::today());
-    Log::info("DEBUG rotation_start_date={$startDateStr}, startTeam={$startTeam}, daysPassed={$daysPassed}");
+    $nextIndex = ($currentIndex + 1) % $teams->count();
+    $nextTeam = $teams[$nextIndex];
+
+    ResponseTeam::whereIn('id', $teams->pluck('id'))
+        ->update(['status' => 'unavailable']);
+
+    $nextTeam->update(['status' => 'available']);
+
+    $nextTeam->rotation_index = $nextIndex;
+    $nextTeam->save();
+
+    ResponseTeam::where('team_name', 'Medical')->update(['status' => 'available']);
     
-    $currentIndex = ($startIndex + $daysPassed) % count($teamsOrder);
-    $currentTeamName = $teamsOrder[$currentIndex];
-
-    ResponseTeam::whereIn('team_name', $teamsOrder)->update(['status' => 'unavailable']);
-    ResponseTeam::where('team_name', $currentTeamName)->update(['status' => 'available']);
-
-    if ($daysPassed >= 1) {
-        Cache::forever('rotation_start_date', Carbon::today()->toDateString());
-        Cache::forever('rotation_start_team', $currentTeamName);
-    }
-
-    Log::info("Team rotation applied. Available team: {$currentTeamName}");
-    $this->info("Team rotation applied. Available team: {$currentTeamName}");
+    Log::info("Team rotation applied. Available team: {$nextTeam->team_name}");
+    $this->info("Rotation complete. Available team: {$nextTeam->team_name}");
 });

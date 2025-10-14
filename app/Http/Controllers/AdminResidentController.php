@@ -34,10 +34,12 @@ class AdminResidentController extends Controller
         return response()->json($residents);
     }
 
-    public function pendingResidentsCount(Request $request)
+    public function pendingResidentsCount()
     {
-        $count = User::where('role_id', 4)->where('residency_status', 'pending')->count();
+        $count = User::where('residency_status', 'pending')->count();
+    
         Log::info('pendingResidentsCount hit');
+    
         return response()->json([
             'pending_residents' => $count
         ]);

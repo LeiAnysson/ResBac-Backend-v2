@@ -283,6 +283,23 @@ class IncidentReportController extends Controller
         return response()->json(['message' => ucfirst($endedByRole).' ended the call']);
     }
 
+    public function markUnanswered(Request $request, $incident)
+    {
+        $incident = IncidentReport::findOrFail($incident);
+
+        if ($incident->reported_by !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $incident->status = 'unanswered';
+        $incident->save();
+
+        return response()->json([
+            'message' => 'Incident marked as unanswered',
+            'incident' => $incident,
+        ]);
+    }
+
     public function acknowledgeBackup(Request $request, $backupId)
     {
         $backup = BackupRequest::find($backupId);
@@ -347,4 +364,39 @@ class IncidentReportController extends Controller
 
         return response()->json(['weekly_reports' => $count]);
     }
+
+    public function ongoingReports()
+    {
+        $count = IncidentReport::where('status', '!=', 'resolved')->count();
+
+        return response()->json(['ongoing_reports' => $count]);
+    }
+
+    public function latestReport()
+    {
+        $report = IncidentReport::with('incidentType', 'teamAssignments.team')
+            ->latest('reported_at')
+            ->first();
+
+        if (!$report) {
+            return response()->json(null);
+        }
+
+        $latestAssignment = $report->teamAssignments->sortByDesc('created_at')->first();
+
+        return response()->json([
+            'id' => $report->id,
+            'type' => $report->incidentType->name ?? 'Unknown',
+            'status' => $latestAssignment->status ?? $report->status ?? 'N/A',
+            'landmark' => $report->landmark,
+            'latitude' => $report->latitude,
+            'longitude' => $report->longitude,
+            'location' => $report->location ?? null,
+            'response_team' => $latestAssignment->team->team_name ?? 'Unassigned',
+            'date' => Carbon::parse($report->reported_at)->format('M d, Y h:i A'),
+        ]);
+    }
+
+
+
 }

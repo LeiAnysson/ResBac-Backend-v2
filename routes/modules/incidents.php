@@ -6,6 +6,10 @@ use App\Http\Controllers\IncidentCallerController;
 use App\Http\Controllers\IncidentUpdateController;
 use App\Http\Controllers\ResponseTeamAssignmentController;
 
+Route::get('/incidents/weekly-reports', [IncidentReportController::class, 'reportsResolvedThisWeek']);
+Route::get('/incidents/ongoing-reports', [IncidentReportController::class, 'ongoingReports']);
+Route::get('/incidents/latest-report', [IncidentReportController::class, 'latestReport']);
+
 Route::middleware(['auth:sanctum', 'role:Admin'])->group(function () {
     Route::delete('/incidents/{id}', [IncidentReportController::class, 'destroy']);
 });
@@ -13,7 +17,6 @@ Route::middleware(['auth:sanctum', 'role:Admin'])->group(function () {
 Route::middleware(['auth:sanctum', 'role:Admin,MDRRMO'])->group(function () {
     Route::get('/incidents', [IncidentReportController::class, 'index']);
     Route::get('/incidents/{id}', [IncidentReportController::class, 'show']);
-    Route::get('/incidents/weekly-reports', [IncidentReportController::class, 'reportsResolvedThisWeek']);
 });
 
 Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {
@@ -33,6 +36,7 @@ Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {
 
 Route::middleware(['auth:sanctum', 'role:Resident'])->group(function () {
     Route::post('incidents/from-resident', [IncidentReportController::class, 'storeFromResident']);
+    Route::patch('incidents/{incident}/update-status', [IncidentReportController::class, 'markUnanswered']);
 });
 
 Route::middleware(['auth:sanctum', 'role:Resident,MDRRMO'])->group(function () {

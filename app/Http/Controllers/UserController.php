@@ -44,7 +44,11 @@ class UserController extends Controller
 
     public function totalUsers()
     {
-        $count = User::count();
+        $count = User::where(function($q) {
+            $q->where('residency_status', '!=', 'pending')
+            ->orWhereNull('residency_status')
+            ->orWhere('residency_status', 'N/A');
+        })->count();
 
         return response()->json(['total_users' => $count]);
     }
@@ -223,13 +227,4 @@ class UserController extends Controller
 
         return response()->json(['message' => 'User deleted successfully']);
     }
-
-
-    // dashboard data  (still not working T.T)
-    // public function pendingResidents()
-    // {
-    //     $pending = User::whereHas('role', fn($q) => $q->where('name', 'resident'))
-    //                 ->where('residency_status', 'pending')->get();
-    //     return response()->json($pending);
-    // }
 }
