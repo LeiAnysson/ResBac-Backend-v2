@@ -4,13 +4,13 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use App\Models\IncidentReport;
 use Illuminate\Support\Facades\Log;
 
-class IncidentCallCreated implements ShouldBroadcast
+class IncidentCallCreated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -41,6 +41,7 @@ class IncidentCallCreated implements ShouldBroadcast
                 'name' => $this->report->incidentType->name,
             ],
             'reporter_id' => $this->report->user->id,
+            'reporter_type' => $this->report->reporter_type,
             'target_role' => 2,
             'user' => [
                 'id'         => $this->report->user->id,

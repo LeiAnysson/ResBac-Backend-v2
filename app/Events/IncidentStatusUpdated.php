@@ -8,13 +8,13 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
-class IncidentUpdated implements ShouldBroadcastNow
+class IncidentStatusUpdated implements ShouldBroadcastNow
 {
     use InteractsWithSockets, SerializesModels;
 
     public $incident;
 
-    public function __construct(IncidentReport $incident)
+    public function __construct(IncidentReport $incident, $originRole = null)
     {
         $this->incident = $incident;
     }
@@ -22,7 +22,6 @@ class IncidentUpdated implements ShouldBroadcastNow
     public function broadcastOn()
     {
         return [
-            new Channel('responder'),
             new Channel('resident'),
             new Channel('dispatcher'),
         ];
@@ -30,6 +29,14 @@ class IncidentUpdated implements ShouldBroadcastNow
 
     public function broadcastAs()
     {
-        return 'IncidentUpdated';
+        return 'IncidentStatusUpdated';
+    }
+
+    public function broadcastWith()
+    {
+        return [
+            'incident' => is_array($this->incident) ? $this->incident : $this->incident->toArray(),
+            'target_roles' => [2,4]
+        ];
     }
 }

@@ -39,10 +39,9 @@ class BackupAcknowledged implements ShouldBroadcastNow
                 'id' => $this->incident->id,
                 'status' => $this->incident->status,
             ],
+            'target_role' => 3,
             'backup_type' => $this->backup->backup_type,
-            'team' => [
-                'id' => $this->backup->response_team_id,
-            ],
+            'team_id' => $this->backup->team_id,
         ];
     }
 }

@@ -12,9 +12,10 @@ use App\Models\ResponseTeam;
 use App\Models\BackupRequest;
 use Ably\AblyRest;
 use Illuminate\Support\Facades\Log;
-use App\Events\IncidentUpdated;
+use App\Events\IncidentStatusUpdated;
 use App\Events\BackupRequestCreated;
 use App\Events\BackupAutomaticallyAssigned;
+use App\Events\IncidentAssigned;
 
 class ResponderReportController extends Controller
 {
@@ -137,7 +138,7 @@ class ResponderReportController extends Controller
                 $incident->status = 'On Scene';
                 $incident->save();
 
-                broadcast(new IncidentUpdated($incident))->toOthers();
+                broadcast(new IncidentStatusUpdated($incident))->toOthers();
             }
         }
 
@@ -200,7 +201,7 @@ class ResponderReportController extends Controller
         $incident->status = $assignment->status;
         $incident->save();
         
-        broadcast(new IncidentUpdated($incident))->toOthers();
+        broadcast(new IncidentStatusUpdated($incident))->toOthers();
 
         return response()->json([
             'success' => true,
@@ -257,7 +258,10 @@ class ResponderReportController extends Controller
                     'status' => 'assigned',
                 ]);
 
-                $incident->status = 'Backup (Medical Team) Assigned';
+                $teamData = $medicTeam->only(['id', 'team_name', 'status']);
+                broadcast(new IncidentAssigned($incident, $teamData));
+
+                $incident->status = 'Backup Assigned';
                 $incident->save();
 
                 broadcast(new BackupAutomaticallyAssigned($incident, $backup, $medicTeam))->toOthers();
@@ -273,14 +277,18 @@ class ResponderReportController extends Controller
             } else {
                 Log::warning('No Medical team found.');
             }
+        } else if ($request->backup_type === 'lgu') {
+            Log::info('LGU backup type detected.');
+
+            $requestingTeam = ResponseTeam::find($teamId);
+
+            broadcast(new BackupRequestCreated($incident, $backup, $requestingTeam))->toOthers();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'LGU backup request sent successfully.',
+                'backup' => $backup,
+            ]);
         }
-
-        broadcast(new BackupRequestCreated($incidentId,$teamId,$request->backup_type))->toOthers();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Backup request sent to dispatcher.',
-            'backup' => $backup,
-        ]);
     }
 }

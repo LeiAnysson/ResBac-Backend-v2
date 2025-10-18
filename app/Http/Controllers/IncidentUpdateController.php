@@ -7,7 +7,7 @@ use App\Models\IncidentUpdate;
 use App\Models\IncidentReport;
 use Illuminate\Support\Facades\Auth;
 use Ably\AblyRest;
-use App\Events\IncidentUpdated;
+use App\Events\IncidentDetailsUpdated;
 use Illuminate\Support\Facades\Log;
 
 class IncidentUpdateController extends Controller
@@ -76,14 +76,14 @@ class IncidentUpdateController extends Controller
             }
 
             try {
-                broadcast(new IncidentUpdated($incident))->toOthers();
+                broadcast(new IncidentDetailsUpdated($incident))->toOthers();
                 Log::info("Broadcast successful");
             } catch (\Exception $e) {
                 Log::error("Broadcast failed", ['error' => $e->getMessage()]);
             }
 
             return response()->json([
-                'message' => 'Incident updated successfully',
+                'message' => 'Incident details updated successfully',
                 'data'    => $update,
             ], 201);
 

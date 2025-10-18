@@ -9,6 +9,7 @@ use App\Http\Controllers\ResponseTeamAssignmentController;
 Route::get('/incidents/weekly-reports', [IncidentReportController::class, 'reportsResolvedThisWeek']);
 Route::get('/incidents/ongoing-reports', [IncidentReportController::class, 'ongoingReports']);
 Route::get('/incidents/latest-report', [IncidentReportController::class, 'latestReport']);
+Route::get('/incidents/latest-reports', [IncidentReportController::class, 'latestReports']);
 
 Route::middleware(['auth:sanctum', 'role:Admin'])->group(function () {
     Route::delete('/incidents/{id}', [IncidentReportController::class, 'destroy']);

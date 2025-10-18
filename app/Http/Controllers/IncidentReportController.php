@@ -25,6 +25,7 @@ use App\Events\DuplicateReportCreated;
 use App\Events\IncidentAssigned;
 use App\Events\BackupAcknowledged;
 use App\Models\BackupRequest;
+use Illuminate\Support\Collection;
 
 class IncidentReportController extends Controller
 {
@@ -56,11 +57,14 @@ class IncidentReportController extends Controller
     
     public function show($id)
     {
-        $incident = IncidentReport::with(['incidentType', 'user']) 
-            ->where('id', $id)
-            ->first();
+        $incident = IncidentReport::with([
+            'incidentType',
+            'user',
+            'firstTeamAssignment.team',
+            'latestTeamAssignment.team'
+        ])->find($id);
 
-        if (!$incident){
+        if (!$incident) {
             return response()->json(['message' => 'Incident Report not found'], 404);
         }
 
@@ -148,6 +152,7 @@ class IncidentReportController extends Controller
 
             $latitude  = $validated['latitude'] ?? null;
             $longitude = $validated['longitude'] ?? null;
+            $reporterType = $validated['reporter_type'];
 
             $incidentType = \App\Models\IncidentType::findOrFail($validated['incident_type_id']);
             $priorityId   = $incidentType->priority_id ?? null;
@@ -199,6 +204,7 @@ class IncidentReportController extends Controller
                 'landmark'         => $validated['landmark'] ?? null,
                 'status'           => 'Pending',
                 'reported_by'      => $userId,
+                'reporter_type'    => $validated['reporter_type'],
                 'caller_name'      => $user->first_name . ' ' . $user->last_name,
                 'priority_id'      => $priorityId,
                 'reported_at'      => now(),
@@ -245,7 +251,11 @@ class IncidentReportController extends Controller
             }
 
             try {
-                broadcast(new IncidentAssigned($incident, $assignedTeam));
+                $event = new IncidentAssigned($incident, $teamData);
+                Log::info('IncidentAssigned broadcastWith payload:', $event->broadcastWith());
+
+                broadcast(new IncidentAssigned($incident, $teamData));
+                Log::info("IncidentAssigned broadcast successful!");
             } catch (\Exception $e) {
                 Log::error('IncidentAssigned broadcast failed: ' . $e->getMessage());
             }
@@ -255,6 +265,7 @@ class IncidentReportController extends Controller
             return response()->json([
                 'message'  => 'Incident reported successfully',
                 'incident' => $incident,
+                'reporter_type'  => $reporterType,
                 'team'     => $teamData,
             ], 201);
 
@@ -266,7 +277,6 @@ class IncidentReportController extends Controller
             ], 500);
         }
     }
-
 
     public function endCall(Request $request, $incidentId)
     {
@@ -397,6 +407,35 @@ class IncidentReportController extends Controller
         ]);
     }
 
+    public function latestReports()
+    {
+        $reports = IncidentReport::with('incidentType', 'teamAssignments.team')
+            ->latest('reported_at')
+            ->take(2)
+            ->get();
+
+        if ($reports->isEmpty()) {
+            return response()->json([]);
+        }
+
+        $processedReports = $reports->map(function ($report) {
+            $latestAssignment = $report->teamAssignments->sortByDesc('created_at')->first();
+
+            return [
+                'id' => $report->id,
+                'type' => $report->incidentType->name ?? 'Unknown',
+                'status' => $latestAssignment->status ?? $report->status ?? 'N/A',
+                'landmark' => $report->landmark,
+                'latitude' => $report->latitude,
+                'longitude' => $report->longitude,
+                'location' => $report->location ?? null,
+                'response_team' => $latestAssignment->team->team_name ?? 'Unassigned',
+                'date' => Carbon::parse($report->reported_at)->format('M d, Y h:i A'),
+            ];
+        });
+
+        return response()->json($processedReports);
+    }
 
 
 }

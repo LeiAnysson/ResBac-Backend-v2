@@ -25,6 +25,7 @@ class IncidentReport extends Model
         'reported_at',
         'priority_id',
         'duplicates',
+        'reporter_type',
     ];
 
     protected $dates = ['reported_at'];
@@ -63,9 +64,25 @@ class IncidentReport extends Model
 
     public function teamAssignments()
     {
-        return $this->hasMany(ResponseTeamAssignment::class, 'incident_id');
+        return $this->hasMany(ResponseTeamAssignment::class, 'incident_id')
+                    ->whereNotNull('team_id')
+                    ->with('team');
     }
 
+    public function firstTeamAssignment()
+    {
+        return $this->hasOne(ResponseTeamAssignment::class, 'incident_id')
+                    ->whereNotNull('team_id')
+                    ->oldestOfMany()
+                    ->with('team');
+    }
 
+    public function latestTeamAssignment()
+    {
+        return $this->hasOne(ResponseTeamAssignment::class, 'incident_id')
+                    ->whereNotNull('team_id')
+                    ->latestOfMany()
+                    ->with('team');
+    }
 
 }

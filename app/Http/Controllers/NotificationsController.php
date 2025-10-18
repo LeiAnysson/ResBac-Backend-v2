@@ -10,23 +10,25 @@ class NotificationsController extends Controller
 {
     public function store(Request $request)
     {
-        if (isset($request->user_id)) {
+        $message = $request->message ?? '';
+
+        if (!empty($request->user_id)) {
             $notification = Notification::create([
                 'user_id' => $request->user_id,
-                'message' => $request->message,
+                'message' => $message,
                 'is_read' => false,
             ]);
             return response()->json($notification, 201);
         }
 
-        if (isset($request->team_id)) {
+        if (!empty($request->team_id)) {
             $users = User::where('team_id', $request->team_id)->get();
             $notifications = [];
 
             foreach ($users as $user) {
                 $notifications[] = Notification::create([
                     'user_id' => $user->id,
-                    'message' => $request->message,
+                    'message' => $message,
                     'is_read' => false,
                 ]);
             }

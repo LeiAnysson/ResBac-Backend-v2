@@ -188,4 +188,28 @@ class ResponseTeamController extends Controller
 
         return response()->json(['message' => 'Response team deleted successfully']);
     }
+
+    public function availableTeams()
+    {
+        $teams = ResponseTeam::with(['members.user'])
+            ->where('status', 'available') 
+            ->get()
+            ->map(function ($team) {
+                return [
+                    'id' => $team->id,
+                    'team_name' => $team->team_name,
+                    'status' => $team->status,
+                    'members' => $team->members->map(function ($m) {
+                        return [
+                            'id' => $m->id,
+                            'name' => $m->user->name ?? 'Unknown',
+                            'type' => $m->type,
+                            'location' => $m->location ?? 'Unknown',
+                        ];
+                    }),
+                ];
+            });
+
+        return response()->json($teams);
+    }
 }

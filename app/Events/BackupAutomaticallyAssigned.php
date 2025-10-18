@@ -50,15 +50,14 @@ class BackupAutomaticallyAssigned implements ShouldBroadcastNow
             ],
             'backup' => [
                 'id' => $this->backup->id,
-                'type' => $this->backup->backup_type,
+                'backup_type' => $this->backup->backup_type,
                 'reason' => $this->backup->reason,
                 'status' => $this->backup->status,
                 'requested_at' => $this->backup->requested_at,
             ],
-            'assigned_team' => [
-                'id' => $this->team->id,
-                'name' => $this->team->name,
-            ],
+            'team_id' => $this->team->id,
+            'team_name' => $this->team->team_name ?? $this->team->name ?? null,
+            'target_roles' => [2, 3],
         ];
     }
 }

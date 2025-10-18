@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ResponseTeamController;
 use Illuminate\Support\Facades\Cache;
 
+Route::get('/teams/available', [ResponseTeamController::class, 'availableTeams']);
+
 Route::middleware(['auth:sanctum', 'role:Admin'])->prefix('admin/teams')->group(function () {
     Route::post('/create-team', [ResponseTeamController::class, 'store']);
     Route::put('/{id}', [ResponseTeamController::class, 'update']); 
