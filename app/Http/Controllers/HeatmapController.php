@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use App\Models\IncidentReport;
+use Carbon\Carbon;
 
 class HeatmapController extends Controller
 {
@@ -32,7 +33,11 @@ class HeatmapController extends Controller
             'Wakas' => ['lat' => 14.805380188970249, 'lng' => 120.919282434933],
         ];
 
-        $incidents = IncidentReport::select('id', 'latitude', 'longitude')->get();
+        $now = Carbon::now();
+        $incidents = IncidentReport::select('id', 'latitude', 'longitude', 'created_at')
+            ->whereYear('created_at', $now->year)
+            ->whereMonth('created_at', $now->month)
+            ->get();
         $barangayCounts = [];
 
         foreach ($incidents as $incident) {

@@ -25,6 +25,7 @@ use App\Events\DuplicateReportCreated;
 use App\Events\IncidentAssigned;
 use App\Events\BackupAcknowledged;
 use App\Models\BackupRequest;
+use App\Models\IncidentType;
 use Illuminate\Support\Collection;
 
 class IncidentReportController extends Controller
@@ -437,5 +438,25 @@ class IncidentReportController extends Controller
         return response()->json($processedReports);
     }
 
+    public function monthlyIncidentCounts()
+    {
+        $startOfMonth = Carbon::now()->startOfMonth();
+        $endOfMonth = Carbon::now()->endOfMonth();
 
+        $counts = IncidentReport::select('incident_type_id', DB::raw('count(*) as count'))
+            ->whereBetween('reported_at', [$startOfMonth, $endOfMonth])
+            ->groupBy('incident_type_id')
+            ->pluck('count', 'incident_type_id'); 
+
+        $incidentTypes = IncidentType::all();
+
+        $result = $incidentTypes->map(function($type) use ($counts) {
+            return [
+                'type' => $type->name,
+                'count' => $counts[$type->id] ?? 0
+            ];
+        });
+
+        return response()->json($result);
+    }
 }

@@ -22,7 +22,7 @@ class ResidencyRejectedMail extends Mailable
 
     public function build()
     {
-        return $this->subject('❌ ResBac Residency Rejected')
+        return $this->subject('ResBac Residency Rejected')
                 ->view('emails.residency-rejected');
     }
 }

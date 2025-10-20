@@ -48,4 +48,14 @@ class User extends Authenticatable
         return $this->hasOne(ResponseTeamMember::class, 'user_id', 'id');
     }
 
+    public function profileImage()
+    {
+        return $this->hasOne(UserImage::class)->with('image');
+    }
+
+    public function userImage()
+    {
+        return $this->hasOne(UserImage::class);
+    }
+
 }

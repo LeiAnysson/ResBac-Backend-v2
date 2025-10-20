@@ -89,7 +89,7 @@ class AdminResidentController extends Controller
 
             recordActivity('approved residency request', 'User', $user->id);
 
-            //Mail::to($user->email)->send(new ResidencyApprovedMail($user));
+            Mail::to($user->email)->send(new ResidencyApprovedMail($user));
 
             DB::commit();
 
@@ -118,7 +118,7 @@ class AdminResidentController extends Controller
 
             recordActivity('rejected residency request', 'User', $user->id);
 
-            //Mail::to($user->email)->send(new ResidencyRejectedMail($user));
+            Mail::to($user->email)->send(new ResidencyRejectedMail($user));
 
             DB::commit();
 

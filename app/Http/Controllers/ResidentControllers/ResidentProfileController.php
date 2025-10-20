@@ -5,6 +5,10 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller; 
 use App\Models\User; 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use App\Models\Image;
+use App\Models\UserImage;
+use Illuminate\Support\Facades\Hash;
 
 class ResidentProfileController extends Controller
 {
@@ -12,6 +16,7 @@ class ResidentProfileController extends Controller
     {
         $resident = User::where('id', $id)
             ->where('role_id', 4) 
+            ->with('userImage.image')
             ->first();
 
         if (!$resident) {
@@ -31,6 +36,9 @@ class ResidentProfileController extends Controller
             'birthdate' => $resident->birthdate,
             'residency_status' => $resident->residency_status,
             'created_at' => $resident->created_at,
+            'profile_image_url' => $resident->userImage && $resident->userImage->image
+                ? $resident->userImage->image->file_path
+                : null,
         ]);
     }
 
@@ -57,4 +65,63 @@ class ResidentProfileController extends Controller
         return response()->json(['message' => 'Profile updated successfully', 'data' => $resident]);
     }
 
+    public function updateProfileImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|max:51200', 
+        ]);
+
+        try {
+            $user = Auth::user();
+
+            $path = $request->file('image')->store('user_images', 'public');
+            $fileName = $request->file('image')->getClientOriginalName();
+
+            $image = Image::create([
+                'file_name' => $fileName,
+                'file_path' => '/storage/' . $path,
+                'uploaded_by' => $user->id,
+            ]);
+
+            UserImage::updateOrCreate(
+                ['user_id' => $user->id],
+                ['image_id' => $image->id]
+            );
+
+            return response()->json([
+                'message' => 'Profile image updated successfully',
+                'image' => [
+                    'id' => $image->id,
+                    'file_path' => $image->file_path,
+                    'file_name' => $image->file_name,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error($e);
+            return response()->json([
+                'error' => 'Failed to update profile image',
+                'details' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'new_password' => 'required|min:8|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json(['message' => 'Current password is incorrect'], 422);
+        }
+
+        $user->password = Hash::make($request->new_password);
+        $user->save();
+
+        return response()->json(['message' => 'Password updated successfully']);
+    }
 }

@@ -5,4 +5,11 @@ use App\Http\Controllers\BackupController;
 
 Route::get('/backup/download', [BackupController::class, 'backup']);
 Route::get('/backup/scheduled', [BackupController::class, 'scheduledBackup']);
-Route::post('/restore', [BackupController::class, 'restore']);
+Route::post('/backup/schedule', [BackupController::class, 'saveSchedule']);
+
+Route::middleware(['auth:sanctum', 'role:Admin'])->group(function () {
+    Route::post('/restore', [BackupController::class, 'restore']);
+});
+
+
+

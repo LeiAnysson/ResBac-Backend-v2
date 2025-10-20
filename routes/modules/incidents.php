@@ -10,6 +10,8 @@ Route::get('/incidents/weekly-reports', [IncidentReportController::class, 'repor
 Route::get('/incidents/ongoing-reports', [IncidentReportController::class, 'ongoingReports']);
 Route::get('/incidents/latest-report', [IncidentReportController::class, 'latestReport']);
 Route::get('/incidents/latest-reports', [IncidentReportController::class, 'latestReports']);
+Route::get('/incidents/monthly-counts', [IncidentReportController::class, 'monthlyIncidentCounts']);
+
 
 Route::middleware(['auth:sanctum', 'role:Admin'])->group(function () {
     Route::delete('/incidents/{id}', [IncidentReportController::class, 'destroy']);

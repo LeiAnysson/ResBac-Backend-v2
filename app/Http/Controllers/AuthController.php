@@ -10,7 +10,11 @@ use App\Models\User;
 use Carbon\Carbon;
 use App\Models\Role;
 use App\Helpers\activity_logger;
+use Illuminate\Support\Facades\Password;
 use App\Helpers\CryptoHelper;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -141,5 +145,58 @@ class AuthController extends Controller
                 'name' => $user->role->name,
             ] : null,
         ]);
+    }
+
+    public function showResetForm(Request $request, $id)
+    {
+        return view('auth.reset_password', ['id' => $id, 'expires' => $request->expires]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+            'token' => 'required|string',
+            'password' => 'required|string|confirmed|min:6',
+        ]);
+
+        $record = DB::table('password_resets')
+            ->where('email', $request->email)
+            ->where('token', $request->token)
+            ->first();
+
+        if (!$record) {
+            return response()->json(['message' => 'Invalid token'], 400);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        DB::table('password_resets')->where('email', $request->email)->delete();
+
+        return response()->json(['message' => 'Password successfully reset!']);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $request->validate(['email' => 'required|email|exists:users,email']);
+        
+        $user = User::where('email', $request->email)->first();
+        $token = Str::random(60);
+
+        DB::table('password_resets')->updateOrInsert(
+            ['email' => $user->email],
+            ['token' => $token, 'created_at' => now()]
+        );
+
+        $resetUrl = env('FRONTEND_URL') . '/reset-password?token=' . $token . '&email=' . $user->email;
+
+        Mail::send('emails.password_reset', ['url' => $resetUrl, 'user' => $user], function ($message) use ($user) {
+            $message->to($user->email);
+            $message->subject('Reset Your Password');
+        });
+
+        return response()->json(['message' => 'Password reset link sent! Check your email.']);
     }
 }

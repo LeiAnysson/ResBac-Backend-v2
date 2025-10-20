@@ -13,6 +13,7 @@ class ResponderProfileController extends Controller
         $responder = User::with(['role', 'responseTeamMember.team'])
             ->where('id', $id)
             ->where('role_id', 3)
+            ->with('userImage.image')
             ->first();
 
         if (!$responder) {
@@ -36,6 +37,9 @@ class ResponderProfileController extends Controller
             'team' => $responder->responseTeamMember && $responder->responseTeamMember->team
                       ? $responder->responseTeamMember->team->team_name
                       : null,
+            'profile_image_url' => $responder->userImage && $responder->userImage->image
+                ? $responder->userImage->image->file_path
+                : null,
         ]);
     }
 

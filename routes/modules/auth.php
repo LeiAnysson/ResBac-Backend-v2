@@ -9,5 +9,12 @@ Route::post('/login', [AuthController::class, 'login'])->middleware(RequestDecry
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/me', [AuthController::class, 'me']); // navbar profile
+    Route::get('/me', [AuthController::class, 'me']);
 });
+
+Route::get('/reset-password/{id}', [AuthController::class, 'showResetForm'])
+    ->name('password.reset')
+    ->middleware('signed'); 
+
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
