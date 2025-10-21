@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Notification;
 use App\Models\User;
+use App\Models\ResponseTeam;
 
 class NotificationsController extends Controller
 {
@@ -22,19 +23,25 @@ class NotificationsController extends Controller
         }
 
         if (!empty($request->team_id)) {
-            $users = User::where('team_id', $request->team_id)->get();
-            $notifications = [];
+            $team = ResponseTeam::with('members.user')->find($request->team_id);
+            if (!$team) {
+                return response()->json(['error' => 'Team not found'], 404);
+            }
 
-            foreach ($users as $user) {
-                $notifications[] = Notification::create([
-                    'user_id' => $user->id,
-                    'message' => $message,
-                    'is_read' => false,
-                ]);
+            $notifications = [];
+            foreach ($team->members as $member) {
+                if ($member->user) {
+                    $notifications[] = Notification::create([
+                        'user_id' => $member->user->id,
+                        'message' => $message,
+                        'is_read' => false,
+                    ]);
+                }
             }
 
             return response()->json($notifications, 201);
         }
+
 
         return response()->json(['error' => 'No user_id or team_id provided'], 400);
     }

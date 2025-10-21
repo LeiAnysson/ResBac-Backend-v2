@@ -459,4 +459,48 @@ class IncidentReportController extends Controller
 
         return response()->json($result);
     }
+
+    public function assignMedic($id)
+    {
+        $incident = IncidentReport::find($id);
+        $user = Auth::user();
+
+        if (!$incident) {
+            return response()->json(['message' => 'Incident not found.'], 404);
+        }
+
+        $hasMedic = ResponseTeamAssignment::query()
+            ->where('incident_id', $id)
+            ->whereHas('team', function ($q) {
+                $q->where('team_name', 'Medical');
+            })
+            ->exists();
+
+        if ($hasMedic) {
+            return response()->json(['message' => 'Medical team already assigned.'], 400);
+        }
+
+        $medicalTeam = ResponseTeam::where('team_name', 'Medical')->first();
+
+        if (!$medicalTeam) {
+            return response()->json(['message' => 'Medical team not found.'], 404);
+        }
+
+        $assignment = ResponseTeamAssignment::create([
+            'incident_id'   => $id,
+            'dispatcher_id' => $user->id,
+            'team_id'       => $medicalTeam->id,
+            'status'        => 'assigned', 
+            'assigned_at'   => now(),
+        ]);
+
+        recordActivity('assigned', 'Medical team assigned by dispatcher ' . $user->id);
+
+        broadcast(new IncidentAssigned($incident, $medicalTeam))->toOthers();
+
+        return response()->json([
+            'message' => 'Medical team successfully assigned.',
+            'assignment' => $assignment,
+        ], 200);
+    }
 }

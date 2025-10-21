@@ -9,6 +9,9 @@ use App\Models\Image;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Events\AnnouncementPosted;
+use App\Models\Notification;
+use App\Models\User;
 
 class AnnouncementController extends Controller
 {
@@ -92,11 +95,22 @@ class AnnouncementController extends Controller
                 }
             }
 
+            $users = User::whereNotIn('role_id', [1, 3])->get();
+            foreach ($users as $user) {
+                Notification::create([
+                    'user_id' => $user->id,
+                    'message' => $announcement->title,
+                    'is_read' => false,
+                ]);
+            }
+
             $announcement->load('images', 'poster');
 
             recordActivity('created a post', 'Announcement', $announcement->posted_by);
 
             DB::commit();
+
+            broadcast(new AnnouncementPosted($announcement))->toOthers();
 
             return response()->json([
                 'message' => 'Announcement created successfully.',

@@ -15,6 +15,8 @@ use App\Helpers\CryptoHelper;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use App\Events\UserRegistered;
+use App\Models\Notification;
 
 class AuthController extends Controller
 {
@@ -73,6 +75,18 @@ class AuthController extends Controller
         ]);
 
         recordActivity('registered', 'Account ' . $user->id);
+
+        broadcast(new UserRegistered($user))->toOthers();
+
+        $admin = User::where('role_id', Role::where('name', 'Admin')->value('id'))->first();
+
+        if ($admin) {
+            Notification::create([
+                'user_id' => $admin->id,
+                'message' => "New resident registered: {$user->first_name} {$user->last_name}",
+                'is_read' => false,
+            ]);
+        }
 
         return response()->json([
             'message' => 'Registration successful',

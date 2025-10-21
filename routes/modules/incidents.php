@@ -35,6 +35,7 @@ Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {
     Route::get('incidents/active', [IncidentReportController::class, 'getActiveIncidents']);
     
     Route::post('incidents/backups/{id}/acknowledge', [IncidentReportController::class, 'acknowledgeBackup']);
+    Route::post('incidents/{id}/assign-medic', [IncidentReportController::class, 'assignMedic']);
 });
 
 Route::middleware(['auth:sanctum', 'role:Resident'])->group(function () {

@@ -13,10 +13,16 @@ class IncidentStatusUpdated implements ShouldBroadcastNow
     use InteractsWithSockets, SerializesModels;
 
     public $incident;
+    public $target_roles;
 
-    public function __construct(IncidentReport $incident, $originRole = null)
+    /**
+     * @param IncidentReport $incident
+     * @param array|null $target_roles 
+     */
+    public function __construct(IncidentReport $incident, ?array $target_roles = null)
     {
         $this->incident = $incident;
+        $this->target_roles = $target_roles ?? [2, 4]; 
     }
 
     public function broadcastOn()
@@ -35,8 +41,8 @@ class IncidentStatusUpdated implements ShouldBroadcastNow
     public function broadcastWith()
     {
         return [
-            'incident' => is_array($this->incident) ? $this->incident : $this->incident->toArray(),
-            'target_roles' => [2,4]
+            'incident' => $this->incident->toArray(),
+            'target_roles' => $this->target_roles,
         ];
     }
 }
