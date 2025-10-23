@@ -26,7 +26,7 @@ class ResponderReportController extends Controller
         Log::info('Responder team_id: ' . $teamId);
 
         $reports = ResponseTeamAssignment::where('team_id', $teamId)
-            ->whereIn('status', ['assigned', 'En Route', 'On Scene', 'Requesting Backup', 'Resolved'])
+            ->whereIn('status', ['Unanswered', 'Assigned', 'En Route', 'On Scene', 'Requesting Backup', 'Resolved'])
             ->with('incident.incidentType')
             ->orderBy('assigned_at', 'desc')
             ->get()
@@ -119,7 +119,7 @@ class ResponderReportController extends Controller
 
         $assignment = ResponseTeamAssignment::where('team_id', $team->id)
             ->whereHas('incident', function ($query) {
-                $query->whereIn('status', ['assigned', 'En Route']);
+                $query->whereIn('status', ['Assigned', 'En Route']);
             })
             ->latest()
             ->first();
@@ -226,7 +226,7 @@ class ResponderReportController extends Controller
             'incident_id' => $incidentId,
             'backup_type' => $request->backup_type,
             'reason' => $request->reason,
-            'status' => 'pending',
+            'status' => 'Pending',
             'requested_at' => now(),
         ]);
 
@@ -255,7 +255,7 @@ class ResponderReportController extends Controller
                     'incident_id' => $incidentId,
                     'team_id' => $medicTeam->id,
                     'dispatcher_id' => Auth::id(),
-                    'status' => 'assigned',
+                    'status' => 'Assigned',
                 ]);
 
                 $teamData = $medicTeam->only(['id', 'team_name', 'status']);
@@ -266,7 +266,7 @@ class ResponderReportController extends Controller
 
                 broadcast(new BackupAutomaticallyAssigned($incident, $backup, $medicTeam))->toOthers();
 
-                $backup->status = 'assigned';
+                $backup->status = 'Assigned';
                 $backup->save();
 
                 return response()->json([

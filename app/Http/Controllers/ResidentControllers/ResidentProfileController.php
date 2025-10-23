@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\Image;
 use App\Models\UserImage;
 use Illuminate\Support\Facades\Hash;
+use App\Models\ResidentProfile;
 
 class ResidentProfileController extends Controller
 {
@@ -50,7 +51,7 @@ class ResidentProfileController extends Controller
             return response()->json(['message' => 'Resident not found'], 404);
         }
 
-        $validated = $request->validate([
+        $validatedUser = $request->validate([
             'first_name' => 'string|max:255',
             'last_name' => 'string|max:255',
             'address' => 'string|nullable',
@@ -60,9 +61,21 @@ class ResidentProfileController extends Controller
             'birthdate' => 'date|nullable',
         ]);
 
-        $resident->update($validated);
+        $resident->update($validatedUser);
 
-        return response()->json(['message' => 'Profile updated successfully', 'data' => $resident]);
+        if ($resident->residentProfile) {
+            $resident->residentProfile->update([
+                'full_name' => $validatedUser['first_name'] . ' ' . $validatedUser['last_name'],
+                'address' => $validatedUser['address'] ?? $resident->residentProfile->address,
+                'birthdate' => $validatedUser['birthdate'] ?? $resident->residentProfile->birthdate,
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $resident,
+            'resident_profile' => $resident->residentProfile,
+        ]);
     }
 
     public function updateProfileImage(Request $request)

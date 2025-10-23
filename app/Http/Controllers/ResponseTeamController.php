@@ -170,15 +170,22 @@ class ResponseTeamController extends Controller
     {
         $data = $req->validate([
             'rotation_start_date' => 'required|date',
-            'rotation_start_team' => 'nullable|string|in:Alpha,Bravo,Charlie',
         ]);
 
         Cache::forever('rotation_start_date', $data['rotation_start_date']);
-        if (!empty($data['rotation_start_team'])) {
-            Cache::forever('rotation_start_team', $data['rotation_start_team']);
-        }
 
-        return response()->json(['message' => 'Rotation start date updated.']);
+        DB::transaction(function () {
+            ResponseTeam::whereIn('rotation_index', [0, 1, 2])
+                ->update(['status' => 'unavailable']);
+
+            ResponseTeam::where('rotation_index', 0)
+                ->update(['status' => 'available']);
+        });
+
+        return response()->json([
+            'message' => 'Rotation start date updated successfully. Rotation reset to Alpha.',
+            'rotation_start_date' => $data['rotation_start_date'],
+        ]);
     }
 
     public function destroy($id)
@@ -212,4 +219,26 @@ class ResponseTeamController extends Controller
 
         return response()->json($teams);
     }
+
+    public function getLastRotationDate()
+    {
+        $availableTeam = ResponseTeam::where('status', 'available')
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (!$availableTeam) {
+            return response()->json([
+                'message' => 'No available team found.',
+                'last_rotation_date' => null,
+            ]);
+        }
+
+        return response()->json([
+            'available_team' => $availableTeam->team_name,
+            'last_rotation_date' => $availableTeam->updated_at
+                ? $availableTeam->updated_at->timezone('Asia/Manila')->format('F d, Y h:i A')
+                : null,
+        ]);
+    }
+
 }

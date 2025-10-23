@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Events\UserRegistered;
 use App\Models\Notification;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -76,16 +77,20 @@ class AuthController extends Controller
 
         recordActivity('registered', 'Account ' . $user->id);
 
-        broadcast(new UserRegistered($user))->toOthers();
-
         $admin = User::where('role_id', Role::where('name', 'Admin')->value('id'))->first();
 
         if ($admin) {
-            Notification::create([
-                'user_id' => $admin->id,
-                'message' => "New resident registered: {$user->first_name} {$user->last_name}",
-                'is_read' => false,
-            ]);
+            try {
+                $notification = Notification::create([
+                    'user_id' => $admin->id,
+                    'message' => "New resident registered: {$user->first_name} {$user->last_name}",
+                    'is_read' => false,
+                ]);
+
+                broadcast(new UserRegistered($user))->toOthers();
+            } catch (\Exception $e) {
+                Log::error('User registration notification failed: ' . $e->getMessage());
+            }
         }
 
         return response()->json([
@@ -93,6 +98,7 @@ class AuthController extends Controller
             'user' => $user
         ], 201);
     }
+
     public function login(Request $request)
     {
         $request->validate([

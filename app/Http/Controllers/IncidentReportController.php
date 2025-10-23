@@ -160,7 +160,52 @@ class IncidentReportController extends Controller
 
             Log::info('Payload:', $validated);
             Log::info('IncidentType:', ['id' => $incidentType->id, 'priority_id' => $priorityId]);
-            
+
+            $latestUnanswered = IncidentReport::where('reported_by', $userId)
+                ->where('incident_type_id', $validated['incident_type_id'])
+                ->where('status', 'Unanswered')
+                ->where('reported_at', '>=', now()->subHours(2))
+                ->latest('reported_at')
+                ->first();
+
+            if ($latestUnanswered) {
+                $latestUnanswered->status = 'Pending';
+                $latestUnanswered->reported_at = now(); 
+                $latestUnanswered->save();
+
+                Log::info("Reopened unanswered incident ID: {$latestUnanswered->id}");
+
+                $originalAssignment = $latestUnanswered->teamAssignments()->latest('created_at')->first();
+                $teamData = null;
+                if ($originalAssignment) {
+                    $originalAssignment->status = 'Assigned';
+                    $originalAssignment->save();
+
+                    $teamData = $originalAssignment->team->only(['id', 'team_name', 'status']);
+
+                    try {
+                        broadcast(new IncidentAssigned($latestUnanswered, $teamData));
+                    } catch (\Exception $e) {
+                        Log::error('IncidentAssigned broadcast failed: ' . $e->getMessage());
+                    }
+                }
+
+                try {
+                    broadcast(new IncidentCallCreated($latestUnanswered));
+                } catch (\Exception $e) {
+                    Log::error('IncidentCallCreated broadcast failed: ' . $e->getMessage());
+                }
+
+                DB::commit();
+
+                return response()->json([
+                    'message' => 'Reopened your previous unanswered incident.',
+                    'incident' => $latestUnanswered,
+                    'reporter_type' => $reporterType,
+                    'team' => $teamData,
+                ], 200);
+            }
+
             $duplicateIncident = IncidentHelper::checkDuplicateReport(
                 $validated['incident_type_id'], 
                 $latitude, 
@@ -242,7 +287,7 @@ class IncidentReportController extends Controller
                         'incident_id'   => $incident->id,
                         'team_id'       => $assignedTeam->id,
                         'dispatcher_id' => $userId,
-                        'status'        => 'assigned',
+                        'status'        => 'Assigned',
                     ]);
 
                     $teamData = $assignedTeam->only(['id', 'team_name', 'status']);
@@ -302,12 +347,22 @@ class IncidentReportController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $incident->status = 'unanswered';
+        $incident->status = 'Unanswered';
         $incident->save();
+
+        $latestAssignment = $incident->teamAssignments()->latest('created_at')->first();
+
+        if ($latestAssignment) {
+            $latestAssignment->status = 'Unanswered';
+            $latestAssignment->save();
+        }
+
+        $teamData = $latestAssignment ? $latestAssignment->team->only(['id', 'team_name', 'status']) : null;
 
         return response()->json([
             'message' => 'Incident marked as unanswered',
             'incident' => $incident,
+            'team' => $teamData
         ]);
     }
 
@@ -321,7 +376,7 @@ class IncidentReportController extends Controller
 
         $incident = IncidentReport::find($backup->incident_id);
 
-        $backup->status = 'acknowledged';
+        $backup->status = 'Acknowledged';
         $backup->save();
 
         broadcast(new BackupAcknowledged($incident, $backup))->toOthers();
@@ -490,7 +545,7 @@ class IncidentReportController extends Controller
             'incident_id'   => $id,
             'dispatcher_id' => $user->id,
             'team_id'       => $medicalTeam->id,
-            'status'        => 'assigned', 
+            'status'        => 'Assigned', 
             'assigned_at'   => now(),
         ]);
 

@@ -16,6 +16,7 @@ Route::middleware(['auth:sanctum', 'role:Admin'])->prefix('admin/teams')->group(
     Route::get('rotation/start-date', function () {
         return response()->json(['rotation_start_date' => Cache::get('rotation_start_date')]);
     });
+    Route::get('/last-rotation', [ResponseTeamController::class, 'getLastRotationDate']);
 });
 
 Route::middleware(['auth:sanctum', 'role:Admin,MDRRMO'])->prefix('admin/teams')->group(function () {
