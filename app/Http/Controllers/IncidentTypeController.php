@@ -20,6 +20,7 @@ class IncidentTypeController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'priority_id' => 'required|exists:incident_priorities,id',
+            'icon' => 'nullable|string|max:50',
         ]);
 
         $incidentType = IncidentType::create($validated);
@@ -37,6 +38,7 @@ class IncidentTypeController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'priority_id' => 'required|exists:incident_priorities,id',
+            'icon' => 'nullable|string|max:50',
         ]);
 
         $incidentType->update($validated);

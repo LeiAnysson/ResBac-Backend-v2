@@ -178,7 +178,7 @@ class IncidentReportController extends Controller
                 $originalAssignment = $latestUnanswered->teamAssignments()->latest('created_at')->first();
                 $teamData = null;
                 if ($originalAssignment) {
-                    $originalAssignment->status = 'Assigned';
+                    $originalAssignment->status = 'En Route';
                     $originalAssignment->save();
 
                     $teamData = $originalAssignment->team->only(['id', 'team_name', 'status']);
@@ -287,10 +287,13 @@ class IncidentReportController extends Controller
                         'incident_id'   => $incident->id,
                         'team_id'       => $assignedTeam->id,
                         'dispatcher_id' => $userId,
-                        'status'        => 'Assigned',
+                        'status'        => 'En Route',
                     ]);
 
                     $teamData = $assignedTeam->only(['id', 'team_name', 'status']);
+
+                    $incident->status = 'En Route';
+                    $incident->save();
                 } catch (\Exception $e) {
                     Log::error('ResponseTeamAssignment creation failed: ' . $e->getMessage());
                 }
@@ -557,5 +560,55 @@ class IncidentReportController extends Controller
             'message' => 'Medical team successfully assigned.',
             'assignment' => $assignment,
         ], 200);
+    }
+
+    public function allReports()
+    {
+        $reports = IncidentReport::with([
+            'incidentType.priority',
+            'user',
+            'latestTeamAssignment.team',
+            'statusLogs.updatedBy'
+        ])->latest('reported_at')
+        ->get()
+        ->map(function ($report) {
+
+            $latestAssignment = $report->latestTeamAssignment;
+
+            $statusHistoryArray = $report->statusLogs
+                ->sortBy('created_at')
+                ->pluck('new_status')
+                ->toArray();
+
+            $statusForDisplay = !empty($statusHistoryArray) 
+                ? implode(' → ', $statusHistoryArray) 
+                : ucfirst($report->status ?? 'N/A');
+
+            return [
+                'incident_type' => $report->incidentType->name ?? 'N/A',
+                'resident_name' => optional($report->user)->first_name . ' ' . optional($report->user)->last_name ?? 'N/A',
+                'landmark' => $report->landmark ?? 'N/A',
+                'latitude' => $report->latitude ?? 'N/A',
+                'longitude' => $report->longitude ?? 'N/A',
+                'status' => ucfirst($report->status ?? 'N/A'),
+                'team_name' => $latestAssignment && $latestAssignment->team ? $latestAssignment->team->team_name : 'Unassigned',
+                'reporter_type' => ucfirst($report->reporter_type ?? 'N/A'),
+                'created_at' => Carbon::parse($report->reported_at)->format('M d, Y h:i A'),
+                'status_history' => $statusForDisplay, 
+            ];
+        });
+
+        return response()->json($reports);
+    }
+
+    public function getProofs($incidentId)
+    {
+        $proofs = DB::table('incident_proof_images')
+            ->join('images', 'incident_proof_images.image_id', '=', 'images.id')
+            ->where('incident_proof_images.incident_id', $incidentId)
+            ->select('images.file_path')
+            ->get();
+
+        return response()->json(['proofs' => $proofs]);
     }
 }

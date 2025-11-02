@@ -12,6 +12,8 @@ Route::middleware(['auth:sanctum', 'role:Responder'])->group(function () {
     Route::get('/responder/report/{id}', [ResponderReportController::class, 'show']);
     Route::post('/responder/report/{id}/update-status', [ResponderReportController::class, 'updateStatus']);
     Route::post('/responder/report/{id}/request-backup', [ResponderReportController::class, 'requestBackup']);
+    Route::post('/responder/report/{id}/upload-proof', [ResponderReportController::class, 'storeProof']);
+    Route::get('/responder/report/{id}/proofs', [ResponderReportController::class, 'getProofs']);
 
     Route::get('/responder/ably-token', function () {
         $ably = new AblyRest(env('ABLY_KEY'));

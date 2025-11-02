@@ -8,6 +8,7 @@ use App\Models\IncidentType;
 use App\Models\IncidentCaller;
 use App\Models\IncidentUpdate;
 use App\Models\ResponseTeamAssignment;
+use App\Models\IncidentStatusLog;
 
 class IncidentReport extends Model
 {
@@ -85,4 +86,8 @@ class IncidentReport extends Model
                     ->with('team');
     }
 
+    public function statusLogs()
+    {
+        return $this->hasMany(IncidentStatusLog::class, 'incident_id');
+    }
 }

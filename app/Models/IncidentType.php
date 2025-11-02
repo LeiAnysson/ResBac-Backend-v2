@@ -18,6 +18,7 @@ class IncidentType extends Model
     protected $fillable = [
         'name',
         'priority_id',
+        'icon'
     ];
 
     public function incidentReports()

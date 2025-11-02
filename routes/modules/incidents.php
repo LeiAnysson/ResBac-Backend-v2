@@ -15,11 +15,13 @@ Route::get('/incidents/monthly-counts', [IncidentReportController::class, 'month
 
 Route::middleware(['auth:sanctum', 'role:Admin'])->group(function () {
     Route::delete('/incidents/{id}', [IncidentReportController::class, 'destroy']);
+    Route::get('/admin/reports/all', [IncidentReportController::class, 'allReports']);
 });
 
 Route::middleware(['auth:sanctum', 'role:Admin,MDRRMO'])->group(function () {
     Route::get('/incidents', [IncidentReportController::class, 'index']);
     Route::get('/incidents/{id}', [IncidentReportController::class, 'show']);
+    Route::get('/incidents/{id}/proofs', [IncidentReportController::class, 'getProofs']);
 });
 
 Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {

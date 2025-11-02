@@ -16,6 +16,8 @@ use App\Events\IncidentStatusUpdated;
 use App\Events\BackupRequestCreated;
 use App\Events\BackupAutomaticallyAssigned;
 use App\Events\IncidentAssigned;
+use App\Models\Image;
+use Illuminate\Support\Facades\DB;
 
 class ResponderReportController extends Controller
 {
@@ -193,14 +195,40 @@ class ResponderReportController extends Controller
             ], 404);
         }
 
+        if ($request->status === 'Resolved') {
+            $enRouteTimestamp = $assignment->getOriginal('updated_at');
+            if ($assignment->status !== 'En Route') {
+                $enRouteTimestamp = $assignment->created_at;
+            }
+
+            $minutesSinceEnRoute = now()->diffInMinutes($enRouteTimestamp);
+
+            if ($minutesSinceEnRoute < 30) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Incident can only be resolved at least 30 minutes after being En Route.'
+                ], 403);
+            }
+        }
+
+        $oldStatus = $assignment->status;
+
         $assignment->status = $request->status;
         $assignment->save();
 
         $incident = $assignment->incident;
-
         $incident->status = $assignment->status;
         $incident->save();
-        
+
+        DB::table('incident_status_logs')->insert([
+            'incident_id' => $incident->id,
+            'old_status' => $oldStatus,
+            'new_status' => $assignment->status,
+            'updated_by' => $user->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         broadcast(new IncidentStatusUpdated($incident))->toOthers();
 
         return response()->json([
@@ -290,5 +318,59 @@ class ResponderReportController extends Controller
                 'backup' => $backup,
             ]);
         }
+    }
+
+    public function storeProof(Request $request, $incidentId)
+    {
+        $request->validate([
+            'proofs.*' => 'required|image|mimes:jpeg,png,jpg|max:51200',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($request->file('proofs') as $file) {
+                $path = $file->store('incident_proofs', 'public');
+
+                $image = Image::create([
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_path' => "/storage/$path",
+                    'uploaded_by' => Auth::id(),
+                ]);
+
+                DB::table('incident_proof_images')->insert([
+                    'incident_id' => $incidentId,
+                    'image_id' => $image->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'All proofs uploaded successfully',
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error($e);
+
+            return response()->json([
+                'error' => 'Failed to upload proof',
+                'details' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getProofs($incidentId)
+    {
+        $proofs = DB::table('incident_proof_images')
+            ->join('images', 'incident_proof_images.image_id', '=', 'images.id')
+            ->where('incident_proof_images.incident_id', $incidentId)
+            ->select('images.file_path')
+            ->get();
+
+        return response()->json(['proofs' => $proofs]);
     }
 }
