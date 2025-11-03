@@ -575,14 +575,18 @@ class IncidentReportController extends Controller
 
             $latestAssignment = $report->latestTeamAssignment;
 
-            $statusHistoryArray = $report->statusLogs
-                ->sortBy('created_at')
-                ->pluck('new_status')
-                ->toArray();
+            $statusLogs = $report->statusLogs
+            ->sortBy('created_at')
+            ->map(function($log) {
+                return [
+                    'status' => $log->new_status,
+                    'created_at' => $log->created_at
+                ];
+            })->values();
 
-            $statusForDisplay = !empty($statusHistoryArray) 
-                ? implode(' → ', $statusHistoryArray) 
-                : ucfirst($report->status ?? 'N/A');
+            $statusForDisplay = $statusLogs->isEmpty()
+            ? ucfirst($report->status ?? 'N/A')
+            : $statusLogs->pluck('status')->implode(' → ');
 
             return [
                 'incident_type' => $report->incidentType->name ?? 'N/A',
@@ -595,6 +599,7 @@ class IncidentReportController extends Controller
                 'reporter_type' => ucfirst($report->reporter_type ?? 'N/A'),
                 'created_at' => Carbon::parse($report->reported_at)->format('M d, Y h:i A'),
                 'status_history' => $statusForDisplay, 
+                'status_logs' => $statusLogs,
             ];
         });
 
