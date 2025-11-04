@@ -56,4 +56,38 @@ class ResidentReportController extends Controller
 
         return response()->json($reports);
     }
+
+    public function addDetailsToUnanswered(Request $request, $incidentId)
+    {
+        $incident = IncidentReport::where('id', $incidentId)
+            ->where('reported_by', Auth::id())
+            ->where('status', 'Unanswered')
+            ->first();
+
+        if (!$incident) {
+            return response()->json(['message' => 'Incident not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'landmark' => 'required|string|max:255',
+            'description' => 'required|string',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+        ]);
+
+        $incident->update([
+            'landmark' => $validated['landmark'],
+            'description' => $validated['description'],
+            'latitude' => $validated['latitude'] ?? $incident->latitude,
+            'longitude' => $validated['longitude'] ?? $incident->longitude,
+            'status' => 'Pending',
+            'reported_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Details submitted successfully!',
+            'incident' => $incident
+        ]);
+    }
+
 }
