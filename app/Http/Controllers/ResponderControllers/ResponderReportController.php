@@ -40,12 +40,20 @@ class ResponderReportController extends Controller
             })
             ->map(function ($assignment) {
                 $report = $assignment->incident;
+
+                $onSceneTime = DB::table('incident_status_logs')
+                    ->where('incident_id', $report->id)
+                    ->where('new_status', 'On Scene')
+                    ->latest('created_at')
+                    ->value('created_at');
+
                 return [
                     'id' => $report->id,
                     'type' => $report->incidentType->name ?? 'Unknown',
                     'status' => $assignment->status,
                     'landmark' => $report->landmark,
                     'date' => \Carbon\Carbon::parse($report->reported_at)->format('M d, Y h:i A'),
+                    'on_scene_time' => $onSceneTime,
                 ];
             });
 
@@ -71,6 +79,12 @@ class ResponderReportController extends Controller
 
         $report = $assignment->incident()->with('incidentType', 'reporter')->first();
 
+        $onSceneTime = DB::table('incident_status_logs')
+            ->where('incident_id', $report->id)
+            ->where('new_status', 'On Scene')
+            ->latest('created_at')
+            ->value('created_at');
+
         return response()->json([
             'success' => true,
             'report' => [
@@ -84,6 +98,7 @@ class ResponderReportController extends Controller
                 'status' => $assignment->status,
                 'dateTime' => \Carbon\Carbon::parse($report->reported_at)->format('M d, Y h:i A'),
                 'description' => $report->description,
+                'on_scene_time' => $onSceneTime,
             ]
         ]);
     }
