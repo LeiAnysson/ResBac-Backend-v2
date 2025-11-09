@@ -247,6 +247,13 @@ class ResponderReportController extends Controller
                     'message' => 'Incident can only be resolved at least 30 minutes after being On Scene.'
                 ], 403);
             }
+
+            $team = ResponseTeam::find($teamId);
+            if ($team) {
+                $team->status = 'available';
+                $team->save();
+                Log::info("Team {$team->team_name} marked as available after resolving incident {$incidentId}");
+            }
         }
 
         $oldStatus = $assignment->status;
