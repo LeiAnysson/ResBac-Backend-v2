@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\GeocodeController;
 use App\Events\IncidentCallCreated;
 use App\Events\CallAccepted;
+use App\Events\CallAlreadyAccepted;
 use Illuminate\Support\Facades\Log;
 use App\Events\NotificationEvent;
 use App\Events\CallEnded;
@@ -27,6 +28,8 @@ use App\Events\BackupAcknowledged;
 use App\Models\BackupRequest;
 use App\Models\IncidentType;
 use Illuminate\Support\Collection;
+use App\Models\User as AppUser;
+use App\Models\Notification;
 
 class IncidentReportController extends Controller
 {
@@ -115,6 +118,7 @@ class IncidentReportController extends Controller
                 'uid' => $uidResident,
             ];
             broadcast(new CallAccepted($incident, $agoraResident));
+            broadcast(new CallAlreadyAccepted($incident->id))->toOthers();
 
             return response()->json([
                 'message' => 'Call accepted successfully',
@@ -155,7 +159,7 @@ class IncidentReportController extends Controller
             $longitude = $validated['longitude'] ?? null;
             $reporterType = $validated['reporter_type'];
 
-            $incidentType = \App\Models\IncidentType::findOrFail($validated['incident_type_id']);
+            $incidentType = IncidentType::findOrFail($validated['incident_type_id']);
             $priorityId   = $incidentType->priority_id ?? null;
 
             Log::info('Payload:', $validated);
@@ -241,7 +245,6 @@ class IncidentReportController extends Controller
                 ], 200);
             }
 
-
             $incident = IncidentReport::create([
                 'incident_type_id' => $validated['incident_type_id'],
                 'description'      => $validated['description'] ?? null,
@@ -271,43 +274,44 @@ class IncidentReportController extends Controller
                 Log::error('IncidentCallCreated broadcast failed: ' . $e->getMessage());
             }
 
-            $assignedTeam = null;
+            // --------------auto assignment--------------
+            // $assignedTeam = null;
 
-            if (strtolower($incidentType->name) !== 'medical') {
-                $assignedTeam = ResponseTeam::where('status', 'available')->first();
-            } else {
-                $assignedTeam = ResponseTeam::where('team_name', 'Medical')->first();
-            }
+            // if (strtolower($incidentType->name) !== 'medical') {
+            //     $assignedTeam = ResponseTeam::where('status', 'available')->first();
+            // } else {
+            //     $assignedTeam = ResponseTeam::where('team_name', 'Medical')->first();
+            // }
 
-            $teamData = null;
+            // $teamData = null;
 
-            if ($assignedTeam) {
-                try {
-                    ResponseTeamAssignment::create([
-                        'incident_id'   => $incident->id,
-                        'team_id'       => $assignedTeam->id,
-                        'dispatcher_id' => $userId,
-                        'status'        => 'En Route',
-                    ]);
+            // if ($assignedTeam) {
+            //     try {
+            //         ResponseTeamAssignment::create([
+            //             'incident_id'   => $incident->id,
+            //             'team_id'       => $assignedTeam->id,
+            //             'dispatcher_id' => $userId,
+            //             'status'        => 'En Route',
+            //         ]);
 
-                    $teamData = $assignedTeam->only(['id', 'team_name', 'status']);
+            //         $teamData = $assignedTeam->only(['id', 'team_name', 'status']);
 
-                    $incident->status = 'En Route';
-                    $incident->save();
-                } catch (\Exception $e) {
-                    Log::error('ResponseTeamAssignment creation failed: ' . $e->getMessage());
-                }
-            }
+            //         $incident->status = 'En Route';
+            //         $incident->save();
+            //     } catch (\Exception $e) {
+            //         Log::error('ResponseTeamAssignment creation failed: ' . $e->getMessage());
+            //     }
+            // }
 
-            try {
-                $event = new IncidentAssigned($incident, $teamData);
-                Log::info('IncidentAssigned broadcastWith payload:', $event->broadcastWith());
+            // try {
+            //     $event = new IncidentAssigned($incident, $teamData);
+            //     Log::info('IncidentAssigned broadcastWith payload:', $event->broadcastWith());
 
-                broadcast(new IncidentAssigned($incident, $teamData));
-                Log::info("IncidentAssigned broadcast successful!");
-            } catch (\Exception $e) {
-                Log::error('IncidentAssigned broadcast failed: ' . $e->getMessage());
-            }
+            //     broadcast(new IncidentAssigned($incident, $teamData));
+            //     Log::info("IncidentAssigned broadcast successful!");
+            // } catch (\Exception $e) {
+            //     Log::error('IncidentAssigned broadcast failed: ' . $e->getMessage());
+            // }
 
             DB::commit();
 
@@ -315,7 +319,7 @@ class IncidentReportController extends Controller
                 'message'  => 'Incident reported successfully',
                 'incident' => $incident,
                 'reporter_type'  => $reporterType,
-                'team'     => $teamData,
+                //'team'     => $teamData,
             ], 201);
 
         } catch (\Exception $e) {
@@ -516,6 +520,98 @@ class IncidentReportController extends Controller
         });
 
         return response()->json($result);
+    }
+
+    public function assignTeam(Request $request, $incidentId)
+    {
+        $incident = IncidentReport::find($incidentId);
+        $dispatcher = Auth::user();
+
+        if (!$incident) {
+            return response()->json(['message' => 'Incident not found.'], 404);
+        }
+
+        $request->validate([
+            'team_id' => 'required|exists:response_teams,id',
+        ]);
+
+        $teamId = $request->team_id;
+        $team = ResponseTeam::find($teamId);
+
+        if (!$team) {
+            return response()->json(['message' => 'Selected team does not exist.'], 404);
+        }
+
+        $alreadyAssigned = ResponseTeamAssignment::where('incident_id', $incidentId)
+            ->where('team_id', $teamId)
+            ->exists();
+
+        if ($alreadyAssigned) {
+            return response()->json(['message' => 'Team already assigned to this incident.'], 400);
+        }
+
+        if ($team->status === 'responding') {
+            return response()->json(['message' => 'Team is currently responding to another incident.'], 400);
+        }
+
+        $assignment = ResponseTeamAssignment::create([
+            'incident_id'   => $incidentId,
+            'team_id'       => $teamId,
+            'dispatcher_id' => $dispatcher->id,
+            'status'        => 'En Route',
+            'assigned_at'   => now(),
+        ]);
+
+        $team->status = 'responding';
+        $team->save();
+
+        if ($incident->status === 'Pending') {
+            $incident->status = 'En Route';
+            $incident->save();
+        }
+
+        try {
+            $event = new IncidentAssigned($incident, $team);
+            Log::info('IncidentAssigned broadcastWith payload:', $event->broadcastWith());
+
+            broadcast(new IncidentAssigned($incident, $team));
+            Log::info("IncidentAssigned broadcast successful!");
+        } catch (\Exception $e) {
+            Log::error('Broadcast failed: ' . $e->getMessage());
+        }
+
+        try {
+            if ($incident->reported_by) {
+                $reporter = AppUser::find($incident->reported_by);
+                if ($reporter && $reporter->role && $reporter->role->name === 'Resident') {
+                    Notification::create([
+                        'user_id' => $reporter->id,
+                        'message' => "Your reported incident (#{$incident->id}) has been assigned to Team {$team->team_name}.",
+                        'is_read' => false,
+                    ]);
+                }
+            }
+
+            $teamMembers = $team->members; 
+            foreach ($teamMembers as $member) {
+                Notification::create([
+                    'user_id' => $member->user_id,
+                    'message' => "You have been assigned to incident (#{$incident->id}).",
+                    'is_read' => false,
+                ]);
+            }
+
+            Log::info("Notifications created for incident assignment.");
+
+        } catch (\Exception $e) {
+            Log::error('Incident assignment notifications failed: ' . $e->getMessage());
+        }
+
+
+        return response()->json([
+            'message' => 'Team assigned successfully.',
+            'assignment' => $assignment,
+        ], 200);
     }
 
     public function assignMedic($id)

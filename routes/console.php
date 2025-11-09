@@ -16,6 +16,9 @@ use App\Http\Controllers\BackupController;
 |
 */
 
+//------CRON JOB------ (if want to revert back to daily team rotation)
+// 0 16 * * * /usr/bin/php /home/u470152037/domains/kiri8tives.com/public_html/resbac-server/artisan rotate:teams >> /home/u470152037/domains/kiri8tives.com/public_html/resbac-server/storage/logs/laravel.log 2>&1
+
 Artisan::command('rotate:teams', function () {
     $teams = ResponseTeam::where('team_name', '!=', 'Medical')
         ->whereNull('deleted_at')

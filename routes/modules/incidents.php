@@ -32,12 +32,12 @@ Route::middleware(['auth:sanctum', 'role:MDRRMO'])->group(function () {
     Route::post('incidents/calls/accept/{incident_id}', [IncidentReportController::class, 'acceptCall']);
 
     Route::get('incidents/active-calls', [IncidentReportController::class, 'fetchActiveCalls']);
-    Route::post('incidents/{id}/assign-team', [ResponseTeamAssignmentController::class, 'store']);
     Route::put('incidents/team-assignments/{id}', [ResponseTeamAssignmentController::class, 'update']);
     Route::get('incidents/active', [IncidentReportController::class, 'getActiveIncidents']);
     
     Route::post('incidents/backups/{id}/acknowledge', [IncidentReportController::class, 'acknowledgeBackup']);
     Route::post('incidents/{id}/assign-medic', [IncidentReportController::class, 'assignMedic']);
+    Route::post('incidents/{id}/assign-team', [IncidentReportController::class, 'assignTeam']);
 });
 
 Route::middleware(['auth:sanctum', 'role:Resident'])->group(function () {

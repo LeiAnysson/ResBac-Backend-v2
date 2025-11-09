@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Auth;
 use Ably\AblyRest;
 use App\Events\IncidentDetailsUpdated;
 use Illuminate\Support\Facades\Log;
+use App\Models\ResponseTeam;
+use App\Models\User;
+use App\Models\Notification;
 
 class IncidentUpdateController extends Controller
 {
@@ -53,7 +56,7 @@ class IncidentUpdateController extends Controller
             Log::info("IncidentUpdate created", ['update' => $update]);
 
             if ($incident->latitude && $incident->longitude && $incident->status !== 'On Scene') {
-                $assignedTeam = \App\Models\ResponseTeam::whereHas('assignments', function ($query) use ($incident) {
+                $assignedTeam = ResponseTeam::whereHas('assignments', function ($query) use ($incident) {
                     $query->where('incident_id', $incident->id);
                 })->first();
                 Log::info("Assigned team fetched", ['team' => $assignedTeam]);
@@ -73,6 +76,35 @@ class IncidentUpdateController extends Controller
                         Log::info("Incident status updated to On Scene");
                     }
                 }
+            }
+
+            try {
+                $reporter =User::find($incident->reported_by);
+                if ($reporter && $reporter->role && $reporter->role->name === 'Resident') {
+                    Notification::create([
+                        'user_id' => $reporter->id,
+                        'message' => "Your reported incident (#{$incident->id}) has been updated by the dispatcher.",
+                        'is_read' => false,
+                    ]);
+                }
+
+                $assignedTeam = ResponseTeam::whereHas('assignments', function ($query) use ($incident) {
+                    $query->where('incident_id', $incident->id);
+                })->first();
+
+                if ($assignedTeam) {
+                    $teamMembers = $assignedTeam->members;
+                    foreach ($teamMembers as $member) {
+                        Notification::create([
+                            'user_id' => $member->user_id,
+                            'message' => "Incident (#{$incident->id}) details have been updated by the dispatcher.",
+                            'is_read' => false,
+                        ]);
+                    }
+                }
+
+            } catch (\Exception $e) {
+                Log::error("Incident details notification failed", ['error' => $e->getMessage()]);
             }
 
             try {

@@ -18,6 +18,9 @@ use App\Events\BackupAutomaticallyAssigned;
 use App\Events\IncidentAssigned;
 use App\Models\Image;
 use Illuminate\Support\Facades\DB;
+use App\Models\Role;
+use App\Models\User;
+use App\Models\Notification;
 
 class ResponderReportController extends Controller
 {
@@ -196,29 +199,46 @@ class ResponderReportController extends Controller
         }
 
         if ($request->status === 'Resolved') {
-            $enRouteTimestamp = $assignment->getOriginal('updated_at');
-            if ($assignment->status !== 'En Route') {
-                $enRouteTimestamp = $assignment->created_at;
+            $onSceneTime = DB::table('incident_status_logs')
+                ->where('incident_id', $incidentId)
+                ->where('new_status', 'On Scene')
+                ->latest('created_at')
+                ->value('created_at');
+
+            if (!$onSceneTime) {
+                $onSceneTime = DB::table('incident_status_logs')
+                    ->where('incident_id', $incidentId)
+                    ->where('new_status', 'En Route')
+                    ->latest('created_at')
+                    ->value('created_at');
             }
 
-            $minutesSinceEnRoute = now()->diffInMinutes($enRouteTimestamp);
-
-            if ($minutesSinceEnRoute < 30) {
+            if (!$onSceneTime) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Incident can only be resolved at least 30 minutes after being En Route.'
+                    'message' => 'Incident cannot be resolved because it was never marked On Scene or En Route.'
+                ], 403);
+            }
+
+            Log::info("Checking resolve wait for incident {$incidentId}");
+            Log::info("On Scene timestamp used: " . ($onSceneTime ?? 'none'));
+            Log::info("Minutes since On Scene: " . now()->diffInMinutes($onSceneTime ?? now()));
+
+            $minutesSinceOnScene = abs(now()->diffInMinutes($onSceneTime));
+
+            if ($minutesSinceOnScene < 30) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Incident can only be resolved at least 30 minutes after being On Scene.'
                 ], 403);
             }
         }
 
         $oldStatus = $assignment->status;
 
-        $assignment->status = $request->status;
-        $assignment->save();
-
+        $assignment->update(['status' => $request->status]);
         $incident = $assignment->incident;
-        $incident->status = $assignment->status;
-        $incident->save();
+        $incident->update(['status' => $assignment->status]);
 
         DB::table('incident_status_logs')->insert([
             'incident_id' => $incident->id,
@@ -229,7 +249,32 @@ class ResponderReportController extends Controller
             'updated_at' => now(),
         ]);
 
-        broadcast(new IncidentStatusUpdated($incident))->toOthers();
+        try {
+            $roles = Role::whereIn('name', ['MDRRMO', 'Admin'])->pluck('id');
+            $recipients = User::whereIn('role_id', $roles)->get();
+
+            foreach ($recipients as $recipient) {
+                Notification::create([
+                    'user_id' => $recipient->id,
+                    'message' => "Incident #{$incident->id} status updated to {$assignment->status} by Team {$assignment->team->team_name}.",
+                    'is_read' => false,
+                ]);
+            }
+
+            $reporter = User::find($incident->reported_by);
+            if ($reporter && $reporter->role && $reporter->role->name === 'Resident') {
+                Notification::create([
+                    'user_id' => $reporter->id,
+                    'message' => "Your reported incident (#{$incident->id}) has been updated to {$assignment->status}.",
+                    'is_read' => false,
+                ]);
+            }
+
+            broadcast(new IncidentStatusUpdated($incident))->toOthers();
+
+        } catch (\Exception $e) {
+            Log::error('Incident status notification failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
